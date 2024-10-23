@@ -1,0 +1,25 @@
+{
+	"name" : "Profile Reborn",
+	"description" : "",
+	"author" : "MetroLine",   
+	"version" : "0.42",
+	"blt_version": 2,
+	"hooks" : [
+		{
+			"hook_id" : "lib/managers/menumanager",
+			"script_path" : "lua/ProfileReborn.lua"
+		},
+		{
+			"hook_id" : "lib/managers/multiprofilemanager",
+			"script_path" : "lua/multiprofilemanager.lua"
+		},
+		{
+			"hook_id" : "lib/managers/localizationmanager",
+			"script_path" : "lua/LocalizationManagerPostInit.lua"
+		},
+		{ 
+			"hook_id" : "core/lib/system/coresystem",
+			"script_path" : "lua/plugin/BLTModAddHooks.lua"
+		}
+	]
+}
