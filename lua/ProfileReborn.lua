@@ -1,4 +1,3 @@
---代码写的很烂，分几年写的，别在意
 ProfileReborn = ProfileReborn or {}
 ProfileReborn.save_path = SavePath .. "ProfileReborn.txt"
 
@@ -555,7 +554,17 @@ function ProfileReborn:set_custom_profile()
 		w = tool_list:w(),
 		h = tool_list:w()
 	})
-			
+	
+	local tool_icon_add_profile = tool_list:bitmap({
+		name = "tool_icon_add_profile",
+		texture = "guis/textures/pd2/none_icon",
+		rotation = 45,
+		layer = 1,
+		y = tool_icon_add_filter:bottom(),
+		w = tool_list:w(),
+		h = tool_list:w()
+	})
+	
 	tool_icon_add_filter:set_center_x(tool_list:w() / 2)
 end
 
@@ -673,6 +682,8 @@ function ProfileReborn:mouse_moved(o, x, y)
 		
 		if self.custom.tool_list:child("tool_icon_add_filter"):inside(x, y) then
 			self._mouse_inside = true
+		elseif self.custom.tool_list:child("tool_icon_add_profile"):inside(x, y) then
+			self._mouse_inside = true
 		end
 		
 		-- filterList
@@ -763,7 +774,62 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			
 			if self.custom.tool_list:child("tool_icon_add_filter"):inside(x, y) then
 				self:create_new_filter()
-				managers.mouse_pointer:set_pointer_image("arrow")			
+				managers.mouse_pointer:set_pointer_image("arrow")
+			elseif self.custom.tool_list:child("tool_icon_add_profile"):inside(x, y) then
+				local dialog_data = {
+					title = "",
+					text = "",
+					button_list = {}
+				}
+
+				for idx, profile in pairs(managers.multi_profile._global._profiles) do
+					local text = profile.name or "Profile " .. idx
+
+					if idx == managers.multi_profile._global._current_profile then
+						text = utf8.char(187) .. text
+						dialog_data.focus_button = idx
+					end
+
+					table.insert(dialog_data.button_list, {
+						text = text,
+						callback_func = function ()
+							self:add_profile_callback(profile)
+						end,
+						focus_callback_func = function ()
+						end
+					})
+				end
+
+				local divider = {
+					no_text = true,
+					no_selection = true
+				}
+
+				table.insert(dialog_data.button_list, divider)
+
+				local no_button = {
+					text = managers.localization:text("dialog_cancel"),
+					focus_callback_func = function ()
+					end,
+					cancel_button = true
+				}
+
+				table.insert(dialog_data.button_list, no_button)
+
+				dialog_data.image_blend_mode = "normal"
+				dialog_data.text_blend_mode = "add"
+				dialog_data.use_text_formating = true
+				dialog_data.w = 480
+				dialog_data.h = 532
+				dialog_data.title_font = tweak_data.menu.pd2_medium_font
+				dialog_data.title_font_size = tweak_data.menu.pd2_medium_font_size
+				dialog_data.font = tweak_data.menu.pd2_small_font
+				dialog_data.font_size = tweak_data.menu.pd2_small_font_size
+				dialog_data.text_formating_color = Color.white
+				dialog_data.text_formating_color_table = {}
+				dialog_data.clamp_to_screen = true
+
+				managers.system_menu:show_buttons(dialog_data)
 			end
 			
 			--##SetCustom
@@ -776,6 +842,10 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			end
 		end
 	end
+end
+
+function ProfileReborn:add_profile_callback(profile)
+	managers.mission._fading_debug_output:script().log(tostring(profile.name), Color.white)
 end
 
 function ProfileReborn:mouse_released(o, button, x, y)
