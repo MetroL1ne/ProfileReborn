@@ -4,6 +4,7 @@ ProfileReborn.save_path = SavePath .. "ProfileReborn.txt"
 function ProfileReborn:active()
 	self._ws = managers.gui_data:create_fullscreen_workspace()
 	self._ui_layer = 100
+	self._wheel_scroll_value = 30
 	self._panel = self._ws:panel():panel({
 		layer = self._ui_layer,	
 		w = 800,
@@ -105,6 +106,7 @@ function ProfileReborn:active()
 	self._ui = {}
 	self.profile = {}
 	self._bg_h = 100
+	self._max_length = 15
 	
 	self:switch_filter(self._current_filter)
 
@@ -401,6 +403,8 @@ function ProfileReborn:reset_panel()
 	if self.custom and self.custom.panel then
 		self._panel:remove(self.custom.panel)
 		self._ws:panel():remove(self.custom.filter_list)
+		self._ws:panel():remove(self.custom.tool_list)
+		
 		self.custom.panel = nil
 		self.custom.filters = {}
 	end
@@ -566,12 +570,57 @@ function ProfileReborn:set_custom_profile()
 	})
 	
 	tool_icon_add_filter:set_center_x(tool_list:w() / 2)
+	
+	self._input_panel = self.custom.panel:panel({
+		visible = false,
+		layer = self._ui_layer + 1,
+		w = 150,
+		h = 30
+	})
+	
+	self._input_panel:set_center(self.custom.panel:center_x(), self.custom.panel:center_y())
+	
+	self._name_text = self._input_panel:rect({
+		vertical = "center",
+		align = "center",
+		color = Color.yellow,
+		alpha = 0.9,
+		layer = -1,
+		w = self._panel:w(),
+		h = self._panel:h()
+	})
+	
+	self._name_text = self._input_panel:text({
+		vertical = "center",
+		align = "center",
+		text = name,
+		font = tweak_data.menu.pd2_small_font,
+		font_size = tweak_data.menu.pd2_medium_font_size,
+		color = tweak_data.screen_colors.button_stage_3
+	})
+end
+
+function ProfileReborn:add_profile_callback(profile, idx)
+	local filter = self.custom.filters[self.custom.current_custom_filter]
+	local new_profile = #filter.profiles + 1
+	
+	self.profile[new_profile] = profile
+	self:set_profile(self._ui.profile, new_profile, profile, idx)
+	
+	filter.profiles[new_profile] = {
+		profile = profile,
+		idx = idx
+	}
+end
+
+function ProfileReborn:start_input()
+	self:trigger()
 end
 
 function ProfileReborn:create_new_filter(name)
 	local idx = #self.custom.filters + 1
 	self.custom.filters[idx] = {
-		name = name or "CustomFilter",
+		name = "CustomFilter" .. tostring(idx),
 		panel = self:create_filter_ui(name, idx),
 		idx = idx,
 		profiles = {}
@@ -716,15 +765,15 @@ end
 function ProfileReborn:mouse_pressed(o, button, x, y)
 	if self._rect:inside(x, y) then
 		if button == Idstring("mouse wheel down") then
-			self:wheel_scroll_bd(-30)
+			self:wheel_scroll_bd(-self._wheel_scroll_value)
 		elseif button == Idstring("mouse wheel up") then
-			self:wheel_scroll_bd(30)
+			self:wheel_scroll_bd(self._wheel_scroll_value)
 		end
 	end
 	
 	if button == Idstring("mouse wheel down") then
 		if self._rect:inside(x, y) then
-			self:wheel_scroll_bd(-30)
+			self:wheel_scroll_bd(-self._wheel_scroll_value)
 		end
 		
 		if self.deck_list and self.deck_list:inside(x, y) then
@@ -732,7 +781,7 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		end
 	elseif button == Idstring("mouse wheel up") then
 		if self._rect:inside(x, y) then
-			self:wheel_scroll_bd(30)
+			self:wheel_scroll_bd(self._wheel_scroll_value)
 		end
 		
 		if self.deck_list and self.deck_list:inside(x, y) then
@@ -764,7 +813,7 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		if self._current_filter == 3 then
 			--##NewCustom
 			if #self.custom.filters <=0 and self._ui_panel:inside(x, y) then
-				self:create_new_filter()
+				self:start_input()
 				managers.mouse_pointer:set_pointer_image("arrow")
 				
 				for _, panel in ipairs(self.custom.first_panel) do
@@ -773,7 +822,13 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			end
 			
 			if self.custom.tool_list:child("tool_icon_add_filter"):inside(x, y) then
-				self:create_new_filter()
+				if #self.custom.filters <=0 then
+					for _, panel in ipairs(self.custom.first_panel) do
+						self.custom.panel:remove(panel)
+					end
+				end
+				
+				self:start_input()
 				managers.mouse_pointer:set_pointer_image("arrow")
 			elseif self.custom.tool_list:child("tool_icon_add_profile"):inside(x, y) then
 				local dialog_data = {
@@ -793,7 +848,7 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 					table.insert(dialog_data.button_list, {
 						text = text,
 						callback_func = function ()
-							self:add_profile_callback(profile)
+							self:add_profile_callback(profile, idx)
 						end,
 						focus_callback_func = function ()
 						end
@@ -833,19 +888,27 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			end
 			
 			--##SetCustom
-			for idx, filter in ipairs(self.custom.filters) do
+			for num, filter in ipairs(self.custom.filters) do
 				if filter.panel:inside(x, y) then
 					self.custom.filters[self.custom.current_custom_filter].panel:child("custom_filter_rect"):set_alpha(0)
 					filter.panel:child("custom_filter_rect"):set_alpha(0.75)
-					self.custom.current_custom_filter = idx
+					self.custom.current_custom_filter = num
+					
+					self._panel:remove(self._ui_panel)
+					self._ui_panel = self._panel:panel()
+					self._ui.profile = {}
+					self.profile = {}
+					
+					if self.custom.filters[num] then
+						for key, data in pairs(self.custom.filters[num].profiles) do
+							self.profile[key] = data.profile
+							self:set_profile(self._ui.profile, key, data.profile, data.idx)
+						end
+					end
 				end
 			end
 		end
 	end
-end
-
-function ProfileReborn:add_profile_callback(profile)
-	managers.mission._fading_debug_output:script().log(tostring(profile.name), Color.white)
 end
 
 function ProfileReborn:mouse_released(o, button, x, y)
@@ -855,17 +918,32 @@ function ProfileReborn:mouse_clicked(o, button, x, y)
 end
 
 function ProfileReborn:key_press(o, k)
+	local mouse_callbacks = managers.mouse_pointer._mouse_callbacks
+	if mouse_callbacks and mouse_callbacks[#mouse_callbacks] and mouse_callbacks[#mouse_callbacks].id ~= self._mouse_id then
+		self._key_release_disable = true
+	end
+	
+	if self._editing then
+		self:handle_key(k, true)
+	end
 end
 
 function ProfileReborn:key_release(o, k)
-	if k == Idstring("esc") then
+	if self._key_release_disable then
+		self._key_release_disable = false
+		return
+	end
+	
+	if self._editing then
+		self:handle_key(k, false)
+	elseif k == Idstring("esc") then
 		if self._panel:visible() then
 			self:hide()
 		end
 	end
 end
 
-function ProfileReborn:switch_filter(value)
+function ProfileReborn:switch_filter(value, custom_switch)
 	if value <= 0 then
 		value = 1
 	elseif value >= #self.filter_method + 1 then
@@ -880,7 +958,9 @@ function ProfileReborn:switch_filter(value)
 	elseif value == 2 then
 		self:set_perk_desk_profile()
 	elseif value == 3 then
-		self:set_custom_profile()
+		if not custom_switch then
+			self:set_custom_profile()
+		end
 	end
 	
 	if self._bg_h * #self._ui.profile >= self._panel:h() then
@@ -899,6 +979,7 @@ function ProfileReborn:switch_filter(value)
 		if self._ui.profile[current_ui]:y() > (self._panel:h() / 2 - self._bg_h / 2) then
 			local dy = self._ui.profile[current_ui]:y() - (self._panel:h() / 2 - self._bg_h / 2)
 			self:wheel_scroll_bd(-dy)
+			self:wheel_scroll_bd(-self._wheel_scroll_value)
 		end
 	end
 	
@@ -931,13 +1012,18 @@ function ProfileReborn:wheel_scroll_bd(dy)
 	
 	if self._bg_h * #profiles >= self._panel:h() then
 		if dy > 0 then
-			dy = profiles[1]:top() >= 0 and -profiles[1]:top() or dy
+			local top = profiles[1]:top()
+			if top >= 0 or top + dy*2 > 0 then
+				dy = -profiles[1]:top()
+			end
 		else
-			if profiles[#profiles]:bottom() <= self._panel:h() then
+			local bottom = profiles[#profiles]:bottom()
+			
+			if bottom <= self._panel:h() or bottom + dy*2 <= self._panel:h() then
 				dy = self._panel:h() - profiles[#profiles]:bottom()
 			end
 		end
-		
+
 		for idx, panel in ipairs(profiles) do
 			panel:set_y(panel:top() + dy)
 		end
@@ -1058,4 +1144,100 @@ function ProfileReborn:get_deployable_icon(deployable)
 	end
 	
 	return deployable_texture
+end
+
+function ProfileReborn:trigger()
+	if not self._editing then
+		self:set_editing(true)
+	else
+		self:set_editing(false)
+	end
+end
+
+function ProfileReborn:set_editing(editing)
+	self._editing = editing
+	self._input_panel:set_visible(editing)
+	
+	if editing then
+		managers.menu:active_menu().input:set_back_enabled(false)
+		managers.menu:active_menu().input:accept_input(false)
+		managers.menu:active_menu().input:set_force_input(false)
+		managers.menu:active_menu().input:deactivate_mouse()
+		managers.mouse_pointer:remove_mouse(self._mouse_data)
+		self._input_panel:enter_text(callback(self, self, "enter_text"))
+
+		local n = utf8.len(self._name_text:text())
+
+		self._name_text:set_selection(n, n)
+
+		if _G.IS_VR then
+			Input:keyboard():show_with_text(self._name_text:text(), self._max_length)
+		end
+	else
+		managers.menu:active_menu().input:activate_mouse()
+		managers.menu:active_menu().input:accept_input(true)
+		managers.menu:active_menu().input:set_back_enabled(true)
+		managers.mouse_pointer:use_mouse(self._mouse_data)
+		self._input_panel:enter_text(nil)
+		self._name_text:set_text("")
+	end
+end
+
+function ProfileReborn:enter_text(o, s)
+	if not self._editing then
+		return
+	end
+
+	if _G.IS_VR then
+		self._name_text:set_text(s)
+	else
+		local s_len = utf8.len(self._name_text:text())
+		s = utf8.sub(s, 1, self._max_length - s_len)
+
+		self._name_text:replace_text(s)
+	end
+end
+
+function ProfileReborn:handle_key(k, pressed)
+	local text = self._name_text
+	local s, e = text:selection()
+	local n = utf8.len(text:text())
+	local d = math.abs(e - s)
+
+	if pressed then
+		if k == Idstring("backspace") then
+			if s == e and s > 0 then
+				text:set_selection(s - 1, e)
+			end
+
+			text:replace_text("")
+		elseif k == Idstring("delete") then
+			if s == e and s < n then
+				text:set_selection(s, e + 1)
+			end
+
+			text:replace_text("")
+		elseif k == Idstring("left") then
+			if s < e then
+				text:set_selection(s, s)
+			elseif s > 0 then
+				text:set_selection(s - 1, s - 1)
+			end
+		elseif k == Idstring("right") then
+			if s < e then
+				text:set_selection(e, e)
+			elseif s < n then
+				text:set_selection(s + 1, s + 1)
+			end
+		elseif k == Idstring("home") then
+			text:set_selection(0, 0)
+		elseif k == Idstring("end") then
+			text:set_selection(n, n)
+		end
+	elseif k == Idstring("enter") then
+		self:create_new_filter(text:text())
+		self:trigger()
+	elseif k == Idstring("esc") then
+		self:set_editing(false)
+	end
 end
