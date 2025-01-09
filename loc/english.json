@@ -3,5 +3,8 @@
 	"menu_bp_filter_perk_deck" : "Perk Deck",
 	"menu_bp_filter_custom" : "Custom",
 	
-	"menu_bp_center_text" : "Click to create a new filter"
+	"menu_bp_center_text" : "Click to create a new filter",
+	"menu_bp_enter_custom_name" : "Enter Name",
+	"menu_bp_dialog_remove_filter" : "Remove Filter",
+	"menu_bp_dialog_please_create_a_filter" : "Please create a filter>_<"
 }
