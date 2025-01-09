@@ -1,6 +1,9 @@
 ProfileReborn = ProfileReborn or {}
 ProfileReborn.save_path = SavePath .. "ProfileReborn.txt"
 
+local MPath = ModPath
+DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_none_icon"), MPath .. "assets/profile_rebvorn_none_icon.texture")
+
 function ProfileReborn:active()
 	self._ws = managers.gui_data:create_fullscreen_workspace()
 	self._ui_layer = 100
@@ -14,9 +17,9 @@ function ProfileReborn:active()
 	
 	self._ui_panel = self._panel:panel()
 	
-	local save_data = io.load_as_json(self.save_path)
+	self:load()
 
-	self._current_filter = save_data and save_data.filter or 1
+	self._current_filter = self.save_data and self.save_data.current_filter or 1
 	self._filter = self._ws:panel():panel({
 		layer = self._ui_layer,
 		w = 150,
@@ -78,7 +81,7 @@ function ProfileReborn:active()
 	self._filter_bg = self._filter:rect({
 		color = Color.black,
 		alpha = 0.9,
-		layer = -2,
+		layer = -50,
 		w = self._filter:w(),
 		h = self._filter:h()
 	})
@@ -86,16 +89,16 @@ function ProfileReborn:active()
 	self._bg = self._ws:panel():bitmap({
 		render_template = "VertexColorTexturedBlur3D",
 		texture = "guis/textures/test_blur_df",
-		w = 1000,
-		h = 1000,
-		layer = self._ui_layer - 1,
+		w = 2000,
+		h = 2000,
+		layer = self._ui_layer - 10,
 		color = Color.white
 	})
 	
 	self._rect = self._panel:rect({
 		color = Color.black,
 		alpha = 0.9,
-		layer = -1,
+		layer = -50,
 		w = self._panel:w(),
 		h = self._panel:h()
 	})
@@ -160,28 +163,28 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	end
 	
 	local top_line = panel:rect({
-		name = "top_line_" .. idx,
+		name = "top_line" .. idx,
 		visible = false,
 		w = panel:w(),
 		h = 2
 	})
 	
 	local bottom_line = panel:rect({
-		name = "bottom_line_" .. idx,
+		name = "bottom_line" .. idx,
 		visible = false,
 		w = panel:w(),
 		h = 2
 	})
 	
 	local left_line = panel:rect({
-		name = "left_line_" .. idx,
+		name = "left_line" .. idx,
 		visible = false,
 		w = 2,
 		h = panel:h()
 	})
 	
 	local right_line = panel:rect({
-		name = "right_line_" .. idx,
+		name = "right_line" .. idx,
 		visible = false,
 		w = 2,
 		h = panel:h()
@@ -191,7 +194,19 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	bottom_line:set_bottom(panel:h())
 	left_line:set_left(0)
 	right_line:set_right(panel:w())
-		
+
+	local remove_icon = panel:bitmap({
+		name = "remove_icon" .. idx,
+		visible = false,
+		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
+		w = 40,
+		h = 40,
+		layer = 3
+	})
+	
+	remove_icon:set_bottom(panel:h()-5)
+	remove_icon:set_right(panel:w()-5)
+	
 	local profile_text = panel:text({
 		font = tweak_data.hud_players.ammo_font,
 		text = text,
@@ -200,7 +215,7 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		y = 5,
 		x = 3
 	})
-		
+	
 	local slot = profile.primary
 	local crafted_items = managers.blackmarket._global.crafted_items
 	local primary = crafted_items["primaries"][slot]
@@ -377,13 +392,7 @@ function ProfileReborn:hide()
 	self._ws:hide()
 	managers.gui_data:destroy_workspace(self._ws)
 
-	--^^--
-	
-	local save_data = {
-		filter = self._current_filter
-	}
-	
-	io.save_as_json(save_data, self.save_path)
+	self:save()
 end
 
 function ProfileReborn:reset_panel()
@@ -404,10 +413,10 @@ function ProfileReborn:reset_panel()
 		self._panel:remove(self.custom.panel)
 		self._ws:panel():remove(self.custom.filter_list)
 		self._ws:panel():remove(self.custom.tool_list)
-		
-		self.custom.panel = nil
-		self.custom.filters = {}
 	end
+	
+	self:load()
+	self:save()
 end
 
 function ProfileReborn:set_default_profile()
@@ -444,7 +453,7 @@ function ProfileReborn:set_perk_desk_profile()
 	deck_list:rect({
 		name = "deck_list_rect",
 		color = Color.black,
-		layer = -2,
+		layer = -50,
 		alpha = 0.6,
 		w = deck_list:w(),
 		h = deck_list:h()
@@ -492,6 +501,57 @@ function ProfileReborn:set_custom_profile()
 	self.custom = {}
 	self.custom.filters = {}
 	self.custom.panel = self._panel:panel({})
+
+	local filters = self.custom.filters
+	
+	self.custom.filter_list = self._ws:panel():panel({
+		layer = 100,
+		w = 200,
+		h = self._panel:h()
+	})
+	
+	local filter_list = self.custom.filter_list
+	filter_list:set_right(self._panel:left())
+	filter_list:set_top(self._panel:top())
+	
+	filter_list:rect({
+		name = "filter_list_rect",
+		color = Color.black,
+		layer = -2,
+		alpha = 0,
+		w = filter_list:w(),
+		h = filter_list:h()
+	})
+	
+	if self.save_data and self.save_data.custom then
+		for k1, data in ipairs(self.save_data.custom) do
+			filters[data.key] = {
+				name = data.name or "CustomFilter#" .. tostring(data.key),
+				panel = self:create_filter_ui(data.name, data.key),
+				key = data.key,
+				profiles = {}
+			}
+			
+			for k2, idx in ipairs(self.save_data.custom[data.key].profiles) do
+				filters[data.key].profiles[k2] = {
+					profile = managers.multi_profile:profile(idx),
+					idx = idx
+				}
+			end
+			
+			self.custom.current_custom_filter = 1
+		end
+	end
+	
+	if filters[1] then
+		filters[1].panel:child("custom_filter_rect"):set_alpha(0.75)
+		
+		for key, data in pairs(filters[1].profiles) do
+			self.profile[key] = data.profile
+			self:set_profile(self._ui.profile, key, data.profile, data.idx)
+		end
+	end
+
 	if #self.custom.filters <= 0 then
 		local add_filter_icon = self.custom.panel:bitmap({
 			texture = "guis/textures/pd2/none_icon",
@@ -519,25 +579,6 @@ function ProfileReborn:set_custom_profile()
 		}
 	end
 	
-	self.custom.filter_list = self._ws:panel():panel({
-		layer = 100,
-		w = 200,
-		h = self._panel:h()
-	})
-	
-	local filter_list = self.custom.filter_list
-	filter_list:set_right(self._panel:left())
-	filter_list:set_top(self._panel:top())
-	
-	filter_list:rect({
-		namc = "filter_list_rect",
-		color = Color.black,
-		layer = -2,
-		alpha = 0,
-		w = filter_list:w(),
-		h = filter_list:h()
-	})
-	
 	self.custom.tool_list = self._ws:panel():panel({
 		layer = self._ui_layer,
 		w = 50,
@@ -549,43 +590,97 @@ function ProfileReborn:set_custom_profile()
 	tool_list:set_left(self._panel:right())
 	tool_list:set_top(self._panel:top())
 
+	tool_list:rect({
+		name = "tool_list_rect",
+		color = Color.black,
+		layer = -50,
+		alpha = 0.6,
+		w = tool_list:w(),
+		h = tool_list:h()
+	})
+	
 	local tool_icon_add_filter = tool_list:bitmap({
 		name = "tool_icon_add_filter",
-		texture = "guis/textures/pd2/none_icon",
+		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
 		rotation = 45,
+		color = tweak_data.screen_colors.text,
+		alpha = 0.5,
 		layer = 1,
 		y = 0,
-		w = tool_list:w(),
-		h = tool_list:w()
+		w = tool_list:w() * 1.2,
+		h = tool_list:w() * 1.2
 	})
 	
 	local tool_icon_add_profile = tool_list:bitmap({
 		name = "tool_icon_add_profile",
-		texture = "guis/textures/pd2/none_icon",
+		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
 		rotation = 45,
+		color = tweak_data.screen_colors.text,
+		alpha = 0.5,
 		layer = 1,
 		y = tool_icon_add_filter:bottom(),
-		w = tool_list:w(),
-		h = tool_list:w()
+		w = tool_list:w() * 1.2,
+		h = tool_list:w() * 1.2
 	})
 	
-	tool_icon_add_filter:set_center_x(tool_list:w() / 2)
+	local tool_icon_remove_filter = tool_list:bitmap({
+		name = "tool_icon_remove_filter",
+		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
+		layer = 1,
+		color = tweak_data.screen_colors.text,
+		alpha = 0.5,
+		y = tool_icon_add_profile:bottom(),
+		w = tool_list:w() * 1.3,
+		h = tool_list:w() * 1.3
+	})
+	
+	self._tool_list = {
+		tool_icon_add_filter,
+		tool_icon_add_profile,
+		tool_icon_remove_filter
+	}
+	
+	tool_icon_add_filter:set_center_x(tool_list:w() / 2 + 1)
+	tool_icon_add_profile:set_center_x(tool_list:w() / 2 + 1)
+	tool_icon_remove_filter:set_center_x(tool_list:w() / 2)
 	
 	self._input_panel = self.custom.panel:panel({
 		visible = false,
 		layer = self._ui_layer + 1,
-		w = 150,
-		h = 30
+		w = 300,
+		h = 120
 	})
 	
 	self._input_panel:set_center(self.custom.panel:center_x(), self.custom.panel:center_y())
 	
-	self._name_text = self._input_panel:rect({
+	self._name_label = self._input_panel:rect({
 		vertical = "center",
 		align = "center",
-		color = Color.yellow,
-		alpha = 0.9,
-		layer = -1,
+		color = Color("3370ff"),
+		layer = 2,
+		w = self._input_panel:w(),
+		h = 30
+	})
+	
+	self._name_text = self._input_panel:text({
+		vertical = "center",
+		align = "left",
+		text = string.upper(managers.localization:text("menu_bp_enter_custom_name")),
+		layer = 4,
+		font = tweak_data.menu.pd2_small_font,
+		font_size = 21,
+		color = Color.white,
+		x = 10
+	})
+	
+	self._name_text:set_center_y(self._name_label:h() / 2)
+	
+	self._name_rect = self._input_panel:rect({
+		vertical = "center",
+		align = "center",
+		color = Color.black,
+		layer = 1,
+		alpha = 1,
 		w = self._panel:w(),
 		h = self._panel:h()
 	})
@@ -593,11 +688,34 @@ function ProfileReborn:set_custom_profile()
 	self._name_text = self._input_panel:text({
 		vertical = "center",
 		align = "center",
-		text = name,
+		text = "",
+		layer = 4,
 		font = tweak_data.menu.pd2_small_font,
 		font_size = tweak_data.menu.pd2_medium_font_size,
 		color = tweak_data.screen_colors.button_stage_3
 	})
+	
+	-- self._name_input_rect = self._input_panel:rect({
+		-- vertical = "center",
+		-- align = "center",
+		-- color = Color("3370ff"),
+		-- layer = 3,
+		-- alpha = 1,
+		-- w = 150,
+		-- h = 10
+	-- })
+	
+	self._name_input_rect = self._input_panel:rect({
+		vertical = "center",
+		align = "center",
+		color = Color("3370ff"),
+		layer = 5,
+		alpha = 1,
+		w = self._input_panel:w(),
+		h = 100
+	})
+	
+	self._name_input_rect:set_center(self._input_panel:center_x(),self._input_panel:center_y())
 end
 
 function ProfileReborn:add_profile_callback(profile, idx)
@@ -618,11 +736,11 @@ function ProfileReborn:start_input()
 end
 
 function ProfileReborn:create_new_filter(name)
-	local idx = #self.custom.filters + 1
-	self.custom.filters[idx] = {
-		name = "CustomFilter" .. tostring(idx),
-		panel = self:create_filter_ui(name, idx),
-		idx = idx,
+	local key = #self.custom.filters + 1
+	self.custom.filters[key] = {
+		name = name or "CustomFilter#" .. tostring(key),
+		panel = self:create_filter_ui(name, key),
+		key = key,
 		profiles = {}
 	}
 	
@@ -630,17 +748,19 @@ function ProfileReborn:create_new_filter(name)
 	
 	self.custom.current_custom_filter = #filters
 	
-	filters[idx].panel:child("custom_filter_rect"):set_alpha(0.75)
+	filters[key].panel:child("custom_filter_rect"):set_alpha(0.75)
 	
 	for cidx, filter in ipairs(filters) do
-		if cidx ~= idx then
+		if cidx ~= key then
 			filter.panel:child("custom_filter_rect"):set_alpha(0)
 		end
 	end
+	
+	self:reset_custom(key, self:get_current_custom_filter())
 end
 
-function ProfileReborn:create_filter_ui(name, idx)
-	local last_filter = self.custom.filters[idx-1]
+function ProfileReborn:create_filter_ui(name, key)
+	local last_filter = self.custom.filters[key-1]
 	local filter = self.custom.filter_list:panel({
 		y = last_filter and last_filter.panel:bottom() or 0,
 		w = self.custom.filter_list:w(),
@@ -665,7 +785,7 @@ function ProfileReborn:create_filter_ui(name, idx)
 		halign = "right",
 		layer = 2,
 		font = tweak_data.hud_players.ammo_font,
-		text = name or "CustomFilter#" .. tostring(idx) ,
+		text = name or "CustomFilter#" .. tostring(key),
 		font_size = 20
 	})	
 	
@@ -686,6 +806,7 @@ function ProfileReborn:mouse_moved(o, x, y)
 	self._mouse_y = y
 	self._mouse_inside = false
 	self._touch_profile = false	
+	self._touch_ui = false
 	
 	if self._panel:inside(self._mouse_x, self._mouse_y) then
 		for idx, box in pairs(self._ui.profile) do
@@ -693,15 +814,21 @@ function ProfileReborn:mouse_moved(o, x, y)
 			if box:inside(self._mouse_x, self._mouse_y) and self._mouse_y > self._panel:y() and self._mouse_y < (self._panel:y() + self._panel:h()) then
 				self._mouse_inside = true
 				self._touch_profile = box:layer() == 0 and idx or box:layer()
-				profile:child("top_line_" .. idx):show()
-				profile:child("bottom_line_" .. idx):show()
-				profile:child("left_line_" .. idx):show()
-				profile:child("right_line_" .. idx):show()
+				self._touch_ui = idx
+				profile:child("top_line" .. idx):show()
+				profile:child("bottom_line" .. idx):show()
+				profile:child("left_line" .. idx):show()
+				profile:child("right_line" .. idx):show()
+				
+				if self._current_filter == 3 then
+					profile:child("remove_icon" .. idx):show()
+				end
 			else
-				profile:child("top_line_" .. idx):hide()
-				profile:child("bottom_line_" .. idx):hide()
-				profile:child("left_line_" .. idx):hide()
-				profile:child("right_line_" .. idx):hide()
+				profile:child("top_line" .. idx):hide()
+				profile:child("bottom_line" .. idx):hide()
+				profile:child("left_line" .. idx):hide()
+				profile:child("right_line" .. idx):hide()
+				profile:child("remove_icon" .. idx):hide()
 			end
 		end
 	end
@@ -728,22 +855,28 @@ function ProfileReborn:mouse_moved(o, x, y)
 		if #self.custom.filters <=0 and self._ui_panel:inside(x, y) then
 			self._mouse_inside = true
 		end
-		
-		if self.custom.tool_list:child("tool_icon_add_filter"):inside(x, y) then
-			self._mouse_inside = true
-		elseif self.custom.tool_list:child("tool_icon_add_profile"):inside(x, y) then
-			self._mouse_inside = true
-		end
-		
+
 		-- filterList
-		for idx, data in ipairs(self.custom.filters) do
-			if data.idx == self.custom.current_custom_filter then
+
+		for _, data in ipairs(self.custom.filters) do
+			if data.key == self.custom.current_custom_filter then
 				data.panel:child("custom_filter_rect"):set_alpha(0.75)
 			elseif data.panel:inside(x, y) then
 				self._mouse_inside = true
 				data.panel:child("custom_filter_rect"):set_alpha(0.5)
 			else
 				data.panel:child("custom_filter_rect"):set_alpha(0)
+			end
+		end
+		
+		-- toolList
+		
+		for _, panel in ipairs(self._tool_list) do
+			if panel:inside(x, y) then
+				self._mouse_inside = true
+				panel:set_alpha(1)
+			else
+				panel:set_alpha(0.5)
 			end
 		end
 	end
@@ -791,8 +924,20 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 	
 	if button == Idstring("0") then
 		if self._touch_profile then
-			managers.multi_profile:set_current_profile(self._touch_profile)
-			self:hide()
+			local profile = self._ui.profile[self._touch_ui]
+			if self._current_filter == 3 and profile:child("remove_icon" .. self._touch_ui):inside(x, y) then
+				local filters = self:get_current_custom_filter()
+				local profiles = filters.profiles
+
+				table.remove(profiles, self._touch_ui)
+				self:reset_custom(self.custom.current_custom_filter, filters)			
+				
+				-- table.remove(self.profile, self._touch_ui)
+				
+			else
+				managers.multi_profile:set_current_profile(self._touch_profile)
+				self:hide()			
+			end
 		elseif self._filter:child("arrow_left"):inside(x, y) then		
 			self:switch_filter(self._current_filter - 1)
 		elseif self._filter:child("arrow_right"):inside(x, y) then
@@ -831,84 +976,142 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 				self:start_input()
 				managers.mouse_pointer:set_pointer_image("arrow")
 			elseif self.custom.tool_list:child("tool_icon_add_profile"):inside(x, y) then
-				local dialog_data = {
-					title = "",
-					text = "",
-					button_list = {}
-				}
+				if #self.custom.filters > 0 then
+					local dialog_data = {
+						title = "",
+						text = "",
+						button_list = {}
+					}
 
-				for idx, profile in pairs(managers.multi_profile._global._profiles) do
-					local text = profile.name or "Profile " .. idx
+					for idx, profile in pairs(managers.multi_profile._global._profiles) do
+						local text = profile.name or "Profile " .. idx
 
-					if idx == managers.multi_profile._global._current_profile then
-						text = utf8.char(187) .. text
-						dialog_data.focus_button = idx
+						if idx == managers.multi_profile._global._current_profile then
+							text = utf8.char(187) .. text
+							dialog_data.focus_button = idx
+						end
+
+						table.insert(dialog_data.button_list, {
+							text = text,
+							callback_func = function ()
+								self:add_profile_callback(profile, idx)
+							end,
+							focus_callback_func = function ()
+							end
+						})
 					end
 
-					table.insert(dialog_data.button_list, {
-						text = text,
-						callback_func = function ()
-							self:add_profile_callback(profile, idx)
-						end,
+					local divider = {
+						no_text = true,
+						no_selection = true
+					}
+
+					table.insert(dialog_data.button_list, divider)
+
+					local no_button = {
+						text = managers.localization:text("dialog_cancel"),
 						focus_callback_func = function ()
-						end
-					})
+						end,
+						cancel_button = true
+					}
+
+					table.insert(dialog_data.button_list, no_button)
+
+					dialog_data.image_blend_mode = "normal"
+					dialog_data.text_blend_mode = "add"
+					dialog_data.use_text_formating = true
+					dialog_data.w = 480
+					dialog_data.h = 532
+					dialog_data.title_font = tweak_data.menu.pd2_medium_font
+					dialog_data.title_font_size = tweak_data.menu.pd2_medium_font_size
+					dialog_data.font = tweak_data.menu.pd2_small_font
+					dialog_data.font_size = tweak_data.menu.pd2_small_font_size
+					dialog_data.text_formating_color = Color.white
+					dialog_data.text_formating_color_table = {}
+					dialog_data.clamp_to_screen = true
+
+					managers.system_menu:show_buttons(dialog_data)
+				else
+					self:dialog_please_create_a_filter()
 				end
+			elseif self.custom.tool_list:child("tool_icon_remove_filter"):inside(x, y) then
+				if #self.custom.filters > 0 then
+					local dialog_data = {
+						title = managers.localization:text("menu_bp_dialog_remove_filter"),
+						text = managers.localization:text("menu_bp_dialog_remove_filter") .. ": " .. self:get_current_custom_filter().name
+					}
 
-				local divider = {
-					no_text = true,
-					no_selection = true
-				}
+					local yes_button = {
+						text = managers.localization:text("dialog_yes"),
+						callback_func = function()
+							table.remove(self.custom.filters, self.custom.current_custom_filter)
+							
+							if (self.custom.current_custom_filter - 1) <= 0 then
+								if self.custom.current_custom_filter + 1 > #self.custom.filters then
+									self.custom.current_custom_filter = 0
+								else
+									self.custom.current_custom_filter = self.custom.current_custom_filter + 1
+								end
+							end
+							
+							for k1, data in ipairs(self.custom.filters) do
+								data.key = k1
+							end
+							
+							self:save()
+							
+							self:switch_filter(3)
+						end
+					}
+					local no_button = {
+						text = managers.localization:text("dialog_cancel"),
+						cancel_button = true
+					}
+					dialog_data.button_list = {
+						yes_button,
+						no_button
+					}
 
-				table.insert(dialog_data.button_list, divider)
-
-				local no_button = {
-					text = managers.localization:text("dialog_cancel"),
-					focus_callback_func = function ()
-					end,
-					cancel_button = true
-				}
-
-				table.insert(dialog_data.button_list, no_button)
-
-				dialog_data.image_blend_mode = "normal"
-				dialog_data.text_blend_mode = "add"
-				dialog_data.use_text_formating = true
-				dialog_data.w = 480
-				dialog_data.h = 532
-				dialog_data.title_font = tweak_data.menu.pd2_medium_font
-				dialog_data.title_font_size = tweak_data.menu.pd2_medium_font_size
-				dialog_data.font = tweak_data.menu.pd2_small_font
-				dialog_data.font_size = tweak_data.menu.pd2_small_font_size
-				dialog_data.text_formating_color = Color.white
-				dialog_data.text_formating_color_table = {}
-				dialog_data.clamp_to_screen = true
-
-				managers.system_menu:show_buttons(dialog_data)
+					managers.system_menu:show(dialog_data)
+				else
+					self:dialog_please_create_a_filter()
+				end
 			end
 			
 			--##SetCustom
 			for num, filter in ipairs(self.custom.filters) do
 				if filter.panel:inside(x, y) then
-					self.custom.filters[self.custom.current_custom_filter].panel:child("custom_filter_rect"):set_alpha(0)
-					filter.panel:child("custom_filter_rect"):set_alpha(0.75)
-					self.custom.current_custom_filter = num
-					
-					self._panel:remove(self._ui_panel)
-					self._ui_panel = self._panel:panel()
-					self._ui.profile = {}
-					self.profile = {}
-					
-					if self.custom.filters[num] then
-						for key, data in pairs(self.custom.filters[num].profiles) do
-							self.profile[key] = data.profile
-							self:set_profile(self._ui.profile, key, data.profile, data.idx)
-						end
-					end
+					self:reset_custom(num, filter)
 				end
 			end
 		end
 	end
+end
+
+function ProfileReborn:reset_custom(num, filter)
+	self.custom.filters[self.custom.current_custom_filter].panel:child("custom_filter_rect"):set_alpha(0)
+	filter.panel:child("custom_filter_rect"):set_alpha(0.75)
+	self.custom.current_custom_filter = num
+
+	self._panel:remove(self._ui_panel)
+	self._ui_panel = self._panel:panel()
+	self._ui.profile = {}
+	self.profile = {}
+					
+	if self.custom.filters[num] then
+		for key, data in pairs(self.custom.filters[num].profiles) do
+			self.profile[key] = data.profile
+			self:set_profile(self._ui.profile, key, data.profile, data.idx)
+		end
+	end
+end
+
+function ProfileReborn:get_current_custom_filter()
+	return self.custom.filters[self.custom.current_custom_filter]
+end
+
+function ProfileReborn:get_custom_filter(index)
+	return self.custom.filters[index]
 end
 
 function ProfileReborn:mouse_released(o, button, x, y)
@@ -1060,90 +1263,20 @@ function ProfileReborn:wheel_scroll_perk(dy)
 	end
 end
 
--- GETING
-
-function ProfileReborn:get_specialization_icon(item)
-	local guis_catalog = "guis/"
-
-	if item.texture_bundle_folder then
-		guis_catalog = guis_catalog .. "dlcs/" .. tostring(item.texture_bundle_folder) .. "/"
-	end
-	
-	local atlas_name = item.icon_atlas or "icons_atlas"
-	local icon_atlas_texture = guis_catalog .. "textures/pd2/specialization/" .. atlas_name
-	
-	local icon_texture_rect = item.icon_texture_rect or {
-		64,
-		64,
-		64,
-		64
+function ProfileReborn:dialog_please_create_a_filter()
+	local dialog_data = {
+		title = managers.localization:text("menu_bp_dialog_please_create_a_filter"),
+		text = ""
 	}
 	
-	local texture_rect_x = item.icon_xy and item.icon_xy[1] or 0
-	local texture_rect_y = item.icon_xy and item.icon_xy[2] or 0	
-	local texture_rect = {
-		texture_rect_x * icon_texture_rect[1],
-		texture_rect_y * icon_texture_rect[2],
-		icon_texture_rect[3],
-		icon_texture_rect[4]
+	local ok_button = {
+		text = managers.localization:text("dialog_ok")
 	}
-	
-	return icon_atlas_texture, texture_rect
-end
+	dialog_data.button_list = {
+		ok_button
+	}
 
-function ProfileReborn:get_projectiles_icon(grenade)
-	local guis_catalog = "guis/"
-	local bundle_folder = tweak_data.blackmarket.projectiles[grenade] and tweak_data.blackmarket.projectiles[grenade].texture_bundle_folder
-
-	if bundle_folder then
-		guis_catalog = guis_catalog .. "dlcs/" .. tostring(bundle_folder) .. "/"
-	end
-
-	local grenade_texture = guis_catalog .. "textures/pd2/blackmarket/icons/grenades/" .. tostring(grenade)
-	return grenade_texture
-end
-
-function ProfileReborn:get_melee_icon(melee_weapon)
-	local guis_catalog = "guis/"
-	local bundle_folder = tweak_data.blackmarket.melee_weapons[melee_weapon] and tweak_data.blackmarket.melee_weapons[melee_weapon].texture_bundle_folder
-
-	if bundle_folder then
-		guis_catalog = guis_catalog .. "dlcs/" .. tostring(bundle_folder) .. "/"
-	end
-
-	local melee_weapon_texture = guis_catalog .. "textures/pd2/blackmarket/icons/melee_weapons/" .. tostring(melee_weapon)
-	return melee_weapon_texture
-end
-
-function ProfileReborn:get_skillpoints_base(idx)
-	local skillpoints = {}
-	local skillset = self.profile[idx].skillset
-	local skill_switches = managers.skilltree._global.skill_switches[skillset]
-	for i = 1, 15 do
-		local point = managers.skilltree:get_tree_progress_new(i, skill_switches)
-		skillpoints[i] = point
-	end
-	
-	return skillpoints
-end
-
-function ProfileReborn:get_deployable_icon(deployable)
-	local deployable_texture
-	
-	if deployable then
-		local guis_catalog = "guis/"
-		local bundle_folder = tweak_data.blackmarket.deployables[deployable] and tweak_data.blackmarket.deployables[deployable].texture_bundle_folder
-
-		if bundle_folder then
-			guis_catalog = guis_catalog .. "dlcs/" .. tostring(bundle_folder) .. "/"
-		end
-
-		deployable_texture = guis_catalog .. "textures/pd2/blackmarket/icons/deployables/" .. tostring(deployable)
-	else
-		deployable_texture = "guis/textures/pd2/add_icon"
-	end
-	
-	return deployable_texture
+	managers.system_menu:show(dialog_data)	
 end
 
 function ProfileReborn:trigger()
@@ -1240,4 +1373,120 @@ function ProfileReborn:handle_key(k, pressed)
 	elseif k == Idstring("esc") then
 		self:set_editing(false)
 	end
+end
+
+function ProfileReborn:save()
+	local save_filters = {}
+	
+	if self.custom and self.custom.filters then
+		for k, filter in ipairs(self.custom.filters) do
+			save_filters[k] = {
+				name = filter.name,
+				key = filter.key
+			}
+			
+			save_filters[k].profiles = {}
+			
+			for k2, profile_data in ipairs(filter.profiles) do
+				save_filters[k].profiles[k2] = profile_data.idx
+			end
+		end
+	end
+	
+	local save_data = {
+		current_filter = self._current_filter,
+		custom = save_filters
+	}
+		
+	io.save_as_json(save_data, self.save_path)
+end
+
+function ProfileReborn:load()
+	self.save_data = io.load_as_json(self.save_path)
+end
+
+-- GETING
+
+function ProfileReborn:get_specialization_icon(item)
+	local guis_catalog = "guis/"
+
+	if item.texture_bundle_folder then
+		guis_catalog = guis_catalog .. "dlcs/" .. tostring(item.texture_bundle_folder) .. "/"
+	end
+	
+	local atlas_name = item.icon_atlas or "icons_atlas"
+	local icon_atlas_texture = guis_catalog .. "textures/pd2/specialization/" .. atlas_name
+	
+	local icon_texture_rect = item.icon_texture_rect or {
+		64,
+		64,
+		64,
+		64
+	}
+	
+	local texture_rect_x = item.icon_xy and item.icon_xy[1] or 0
+	local texture_rect_y = item.icon_xy and item.icon_xy[2] or 0	
+	local texture_rect = {
+		texture_rect_x * icon_texture_rect[1],
+		texture_rect_y * icon_texture_rect[2],
+		icon_texture_rect[3],
+		icon_texture_rect[4]
+	}
+	
+	return icon_atlas_texture, texture_rect
+end
+
+function ProfileReborn:get_projectiles_icon(grenade)
+	local guis_catalog = "guis/"
+	local bundle_folder = tweak_data.blackmarket.projectiles[grenade] and tweak_data.blackmarket.projectiles[grenade].texture_bundle_folder
+
+	if bundle_folder then
+		guis_catalog = guis_catalog .. "dlcs/" .. tostring(bundle_folder) .. "/"
+	end
+
+	local grenade_texture = guis_catalog .. "textures/pd2/blackmarket/icons/grenades/" .. tostring(grenade)
+	return grenade_texture
+end
+
+function ProfileReborn:get_melee_icon(melee_weapon)
+	local guis_catalog = "guis/"
+	local bundle_folder = tweak_data.blackmarket.melee_weapons[melee_weapon] and tweak_data.blackmarket.melee_weapons[melee_weapon].texture_bundle_folder
+
+	if bundle_folder then
+		guis_catalog = guis_catalog .. "dlcs/" .. tostring(bundle_folder) .. "/"
+	end
+
+	local melee_weapon_texture = guis_catalog .. "textures/pd2/blackmarket/icons/melee_weapons/" .. tostring(melee_weapon)
+	return melee_weapon_texture
+end
+
+function ProfileReborn:get_skillpoints_base(idx)
+	local skillpoints = {}
+	local skillset = self.profile[idx].skillset
+	local skill_switches = managers.skilltree._global.skill_switches[skillset]
+	for i = 1, 15 do
+		local point = managers.skilltree:get_tree_progress_new(i, skill_switches)
+		skillpoints[i] = point
+	end
+	
+	return skillpoints
+end
+
+function ProfileReborn:get_deployable_icon(deployable)
+	local deployable_texture
+	
+	if deployable then
+		local guis_catalog = "guis/"
+		local bundle_folder = tweak_data.blackmarket.deployables[deployable] and tweak_data.blackmarket.deployables[deployable].texture_bundle_folder
+
+		if bundle_folder then
+			guis_catalog = guis_catalog .. "dlcs/" .. tostring(bundle_folder) .. "/"
+		end
+
+		deployable_texture = guis_catalog .. "textures/pd2/blackmarket/icons/deployables/" .. tostring(deployable)
+	else
+		deployable_texture = "guis/textures/pd2/add_icon"
+	end
+	
+	return deployable_texture
 end
