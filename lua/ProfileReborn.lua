@@ -3,6 +3,7 @@ ProfileReborn.save_path = SavePath .. "ProfileReborn.txt"
 
 local MPath = ModPath
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_none_icon"), MPath .. "assets/profile_rebvorn_none_icon.texture")
+DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_loading_icon"), MPath .. "assets/profile_rebvorn_loading_icon.texture")
 
 function ProfileReborn:active()
 	self._ws = managers.gui_data:create_fullscreen_workspace()
@@ -341,6 +342,17 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		x = deployable:right() + deployable:h()
 	})
 	mask:set_center_y(profile_bg:center_y())
+	
+	local profile_armor = profile.armor
+	local armor_texture = self:get_armor_icon(profile_armor)
+	local armor = panel:bitmap({
+		texture = armor_texture,
+		w = 70,
+		h = 70,
+		layer = 4,
+		x = mask:right() + 30
+	})
+	armor:set_center_y(profile_bg:center_y())
 end
 
 function ProfileReborn:create_side(panel)
@@ -607,8 +619,8 @@ function ProfileReborn:set_custom_profile()
 		alpha = 0.5,
 		layer = 1,
 		y = 0,
-		w = tool_list:w() * 1.2,
-		h = tool_list:w() * 1.2
+		w = tool_list:w() * 1,
+		h = tool_list:w() * 1
 	})
 	
 	local tool_icon_add_profile = tool_list:bitmap({
@@ -619,8 +631,19 @@ function ProfileReborn:set_custom_profile()
 		alpha = 0.5,
 		layer = 1,
 		y = tool_icon_add_filter:bottom(),
-		w = tool_list:w() * 1.2,
-		h = tool_list:w() * 1.2
+		w = tool_list:w() * 1,
+		h = tool_list:w() * 1
+	})
+	
+	local tool_icon_rename = tool_list:bitmap({
+		name = "tool_icon_rename",
+		texture = "guis/textures/pd2/profile_rebvorn_loading_icon",
+		color = tweak_data.screen_colors.text,
+		alpha = 0.5,
+		layer = 1,
+		y = tool_icon_add_profile:bottom(),
+		w = tool_list:w() * 1,
+		h = tool_list:w() * 1
 	})
 	
 	local tool_icon_remove_filter = tool_list:bitmap({
@@ -629,19 +652,21 @@ function ProfileReborn:set_custom_profile()
 		layer = 1,
 		color = tweak_data.screen_colors.text,
 		alpha = 0.5,
-		y = tool_icon_add_profile:bottom(),
-		w = tool_list:w() * 1.3,
-		h = tool_list:w() * 1.3
+		y = tool_icon_rename:bottom(),
+		w = tool_list:w() * 1,
+		h = tool_list:w() * 1
 	})
 	
 	self._tool_list = {
 		tool_icon_add_filter,
 		tool_icon_add_profile,
+		tool_icon_rename,
 		tool_icon_remove_filter
 	}
 	
 	tool_icon_add_filter:set_center_x(tool_list:w() / 2 + 1)
 	tool_icon_add_profile:set_center_x(tool_list:w() / 2 + 1)
+	tool_icon_rename:set_center_x(tool_list:w() / 2)
 	tool_icon_remove_filter:set_center_x(tool_list:w() / 2)
 	
 	self._input_panel = self.custom.panel:panel({
@@ -694,17 +719,7 @@ function ProfileReborn:set_custom_profile()
 		font_size = tweak_data.menu.pd2_medium_font_size,
 		color = tweak_data.screen_colors.button_stage_3
 	})
-	
-	-- self._name_input_rect = self._input_panel:rect({
-		-- vertical = "center",
-		-- align = "center",
-		-- color = Color("3370ff"),
-		-- layer = 3,
-		-- alpha = 1,
-		-- w = 150,
-		-- h = 10
-	-- })
-	
+
 	self._name_input_rect = self._input_panel:rect({
 		vertical = "center",
 		align = "center",
@@ -729,10 +744,6 @@ function ProfileReborn:add_profile_callback(profile, idx)
 		profile = profile,
 		idx = idx
 	}
-end
-
-function ProfileReborn:start_input()
-	self:trigger()
 end
 
 function ProfileReborn:create_new_filter(name)
@@ -1034,6 +1045,12 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 				else
 					self:dialog_please_create_a_filter()
 				end
+			elseif self.custom.tool_list:child("tool_icon_rename"):inside(x, y) then
+				if #self.custom.filters > 0 then
+					self:start_input(true)
+				else
+					self:dialog_please_create_a_filter()
+				end				
 			elseif self.custom.tool_list:child("tool_icon_remove_filter"):inside(x, y) then
 				if #self.custom.filters > 0 then
 					local dialog_data = {
@@ -1210,6 +1227,12 @@ function ProfileReborn:switch_perk(perk)
 	end
 end
 
+function ProfileReborn:rename_filter(index, new_name)
+	self.custom.filters[index].name = new_name
+	self:save()					
+	self:switch_filter(3)
+end
+
 function ProfileReborn:wheel_scroll_bd(dy)
 	local profiles = self._ui.profile
 	
@@ -1279,9 +1302,17 @@ function ProfileReborn:dialog_please_create_a_filter()
 	managers.system_menu:show(dialog_data)	
 end
 
-function ProfileReborn:trigger()
+function ProfileReborn:start_input(is_rename)
+	self:trigger(is_rename)
+end
+
+function ProfileReborn:trigger(is_rename)
 	if not self._editing then
 		self:set_editing(true)
+		
+		if is_rename then
+			self._is_rename = true
+		end
 	else
 		self:set_editing(false)
 	end
@@ -1313,6 +1344,8 @@ function ProfileReborn:set_editing(editing)
 		managers.mouse_pointer:use_mouse(self._mouse_data)
 		self._input_panel:enter_text(nil)
 		self._name_text:set_text("")
+		
+		self._is_rename = false
 	end
 end
 
@@ -1368,7 +1401,12 @@ function ProfileReborn:handle_key(k, pressed)
 			text:set_selection(n, n)
 		end
 	elseif k == Idstring("enter") then
-		self:create_new_filter(text:text())
+		if self._is_rename then
+			self:rename_filter(self.custom.current_custom_filter, text:text())
+		else
+			self:create_new_filter(text:text())
+		end
+		
 		self:trigger()
 	elseif k == Idstring("esc") then
 		self:set_editing(false)
@@ -1489,4 +1527,17 @@ function ProfileReborn:get_deployable_icon(deployable)
 	end
 	
 	return deployable_texture
+end
+
+function ProfileReborn:get_armor_icon(armor)
+	local guis_catalog = "guis/"
+	local bundle_folder = tweak_data.blackmarket.armors[armor].texture_bundle_folder
+
+	if bundle_folder then
+		guis_catalog = guis_catalog .. "dlcs/" .. tostring(bundle_folder) .. "/"
+	end
+
+	armor_texture = guis_catalog .. "textures/pd2/blackmarket/icons/armors/" .. tostring(armor)
+
+	return armor_texture
 end
