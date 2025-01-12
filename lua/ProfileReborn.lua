@@ -4,11 +4,16 @@ ProfileReborn.save_path = SavePath .. "ProfileReborn.txt"
 local MPath = ModPath
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_none_icon"), MPath .. "assets/profile_rebvorn_none_icon.texture")
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_loading_icon"), MPath .. "assets/profile_rebvorn_loading_icon.texture")
+DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_up_icon"), MPath .. "assets/profile_rebvorn_up_icon.texture")
+DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_down_icon"), MPath .. "assets/profile_rebvorn_down_icon.texture")
 
 function ProfileReborn:active()
 	self._ws = managers.gui_data:create_fullscreen_workspace()
 	self._ui_layer = 100
-	self._wheel_scroll_value = 30
+	self._wheel_scroll_value = 60
+	self._wheel_scroll_value_custom = 15
+	self._filter_list_h = 30
+	
 	self._panel = self._ws:panel():panel({
 		layer = self._ui_layer,	
 		w = 800,
@@ -108,9 +113,14 @@ function ProfileReborn:active()
 	self:create_side(self._filter)
 	
 	self._ui = {}
+	self._ui.profile = {}
 	self.profile = {}
 	self._bg_h = 100
 	self._max_length = 15
+	
+	if not self.custom then
+		self:set_custom_profile()
+	end
 	
 	self:switch_filter(self._current_filter)
 
@@ -124,6 +134,12 @@ function ProfileReborn:active()
 end
 
 function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
+	if not profile then
+		return
+	end
+	
+	self.profile[idx] = profile
+	
 	local text = profile.name or "Profile " .. idx
 
 	if (profile_idx or idx) == managers.multi_profile._global._current_profile then
@@ -134,7 +150,7 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		layer = profile_idx or 0, --借用层级，存取profile编号
 		w = self._rect:w(),
 		h = self._bg_h,
-		y = self._rect:top() + self._bg_h * idx - self._bg_h
+		y = self._rect:top() + self._bg_h * idx - self._bg_h + (ui_panel[1] and ui_panel[1]:y() or 0)
 	})
 	
 	local panel = ui_panel[idx]
@@ -200,13 +216,40 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		name = "remove_icon" .. idx,
 		visible = false,
 		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
+		alpha = 0.5,
 		w = 40,
 		h = 40,
 		layer = 3
 	})
 	
 	remove_icon:set_bottom(panel:h()-5)
-	remove_icon:set_right(panel:w()-5)
+	remove_icon:set_right(panel:right())
+	
+	local down_icon = panel:bitmap({
+		name = "down_icon" .. idx,
+		visible = false,
+		texture = "guis/textures/pd2/profile_rebvorn_down_icon",
+		alpha = 0.5,
+		w = 40,
+		h = 40,
+		layer = 3
+	})
+	
+	down_icon:set_bottom(panel:h()-5)
+	down_icon:set_right(remove_icon:left())
+	
+	local up_icon = panel:bitmap({
+		name = "up_icon" .. idx,
+		visible = false,
+		texture = "guis/textures/pd2/profile_rebvorn_up_icon",
+		alpha = 0.5,
+		w = 40,
+		h = 40,
+		layer = 3
+	})
+	
+	up_icon:set_bottom(panel:h()-5)
+	up_icon:set_right(down_icon:left())
 	
 	local profile_text = panel:text({
 		font = tweak_data.hud_players.ammo_font,
@@ -350,7 +393,7 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		w = 70,
 		h = 70,
 		layer = 4,
-		x = mask:right() + 30
+		x = mask:right() + 15
 	})
 	armor:set_center_y(profile_bg:center_y())
 end
@@ -433,7 +476,6 @@ end
 
 function ProfileReborn:set_default_profile()
 	for idx, profile in pairs(managers.multi_profile._global._profiles) do
-		self.profile[idx] = profile
 		self:set_profile(self._ui.profile, idx, profile)
 	end
 end
@@ -489,7 +531,7 @@ function ProfileReborn:set_perk_desk_profile()
 				h = deck_list:w()
 			})
 			
-			perk_icon:set_center_x(deck_list:w() / 2)
+			perk_icon:set_center_x(deck_list:w() / 2 - 2)
 			last_perk = perk
 			
 			self.LeftList[#self.LeftList+1] = {
@@ -509,11 +551,13 @@ function ProfileReborn:set_perk_desk_profile()
 	self:switch_perk(current_profile.perk_deck)
 end
 
-function ProfileReborn:set_custom_profile()
+function ProfileReborn:set_custom_profile(base_filter)
 	self.custom = {}
 	self.custom.filters = {}
 	self.custom.panel = self._panel:panel({})
-
+	
+	local base_filter = base_filter or (self.save_data and self.save_data.current_custom_filter) or 1
+	
 	local filters = self.custom.filters
 	
 	self.custom.filter_list = self._ws:panel():panel({
@@ -551,15 +595,14 @@ function ProfileReborn:set_custom_profile()
 				}
 			end
 			
-			self.custom.current_custom_filter = 1
+			self.custom.current_custom_filter = base_filter
 		end
 	end
 	
-	if filters[1] then
-		filters[1].panel:child("custom_filter_rect"):set_alpha(0.75)
+	if filters[base_filter] then
+		filters[base_filter].panel:child("custom_filter_rect"):set_alpha(0.75)
 		
-		for key, data in pairs(filters[1].profiles) do
-			self.profile[key] = data.profile
+		for key, data in pairs(filters[base_filter].profiles) do
 			self:set_profile(self._ui.profile, key, data.profile, data.idx)
 		end
 	end
@@ -646,13 +689,35 @@ function ProfileReborn:set_custom_profile()
 		h = tool_list:w() * 1
 	})
 	
+	local tool_icon_up = tool_list:bitmap({
+		name = "tool_icon_up",
+		texture = "guis/textures/pd2/profile_rebvorn_up_icon",
+		color = tweak_data.screen_colors.text,
+		alpha = 0.5,
+		layer = 1,
+		y = tool_icon_rename:bottom(),
+		w = tool_list:w() * 1,
+		h = tool_list:w() * 1
+	})
+	
+	local tool_icon_down = tool_list:bitmap({
+		name = "tool_icon_down",
+		texture = "guis/textures/pd2/profile_rebvorn_down_icon",
+		color = tweak_data.screen_colors.text,
+		alpha = 0.5,
+		layer = 1,
+		y = tool_icon_up:bottom(),
+		w = tool_list:w() * 1,
+		h = tool_list:w() * 1
+	})
+	
 	local tool_icon_remove_filter = tool_list:bitmap({
 		name = "tool_icon_remove_filter",
 		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
 		layer = 1,
 		color = tweak_data.screen_colors.text,
 		alpha = 0.5,
-		y = tool_icon_rename:bottom(),
+		y = tool_icon_down:bottom(),
 		w = tool_list:w() * 1,
 		h = tool_list:w() * 1
 	})
@@ -661,12 +726,16 @@ function ProfileReborn:set_custom_profile()
 		tool_icon_add_filter,
 		tool_icon_add_profile,
 		tool_icon_rename,
+		tool_icon_up,
+		tool_icon_down,
 		tool_icon_remove_filter
 	}
 	
 	tool_icon_add_filter:set_center_x(tool_list:w() / 2 + 1)
 	tool_icon_add_profile:set_center_x(tool_list:w() / 2 + 1)
 	tool_icon_rename:set_center_x(tool_list:w() / 2)
+	tool_icon_up:set_center_x(tool_list:w() / 2)
+	tool_icon_down:set_center_x(tool_list:w() / 2)
 	tool_icon_remove_filter:set_center_x(tool_list:w() / 2)
 	
 	self._input_panel = self.custom.panel:panel({
@@ -687,7 +756,7 @@ function ProfileReborn:set_custom_profile()
 		h = 30
 	})
 	
-	self._name_text = self._input_panel:text({
+	self._name_top_text = self._input_panel:text({
 		vertical = "center",
 		align = "left",
 		text = string.upper(managers.localization:text("menu_bp_enter_custom_name")),
@@ -698,7 +767,7 @@ function ProfileReborn:set_custom_profile()
 		x = 10
 	})
 	
-	self._name_text:set_center_y(self._name_label:h() / 2)
+	self._name_top_text:set_center_y(self._name_label:h() / 2)
 	
 	self._name_rect = self._input_panel:rect({
 		vertical = "center",
@@ -717,7 +786,7 @@ function ProfileReborn:set_custom_profile()
 		layer = 4,
 		font = tweak_data.menu.pd2_small_font,
 		font_size = tweak_data.menu.pd2_medium_font_size,
-		color = tweak_data.screen_colors.button_stage_3
+		color = Color.white -- tweak_data.screen_colors.button_stage_3
 	})
 
 	self._name_input_rect = self._input_panel:rect({
@@ -737,9 +806,8 @@ function ProfileReborn:add_profile_callback(profile, idx)
 	local filter = self.custom.filters[self.custom.current_custom_filter]
 	local new_profile = #filter.profiles + 1
 	
-	self.profile[new_profile] = profile
 	self:set_profile(self._ui.profile, new_profile, profile, idx)
-	
+
 	filter.profiles[new_profile] = {
 		profile = profile,
 		idx = idx
@@ -767,7 +835,7 @@ function ProfileReborn:create_new_filter(name)
 		end
 	end
 	
-	self:reset_custom(key, self:get_current_custom_filter())
+	self:switch_filter(3, key)
 end
 
 function ProfileReborn:create_filter_ui(name, key)
@@ -775,7 +843,7 @@ function ProfileReborn:create_filter_ui(name, key)
 	local filter = self.custom.filter_list:panel({
 		y = last_filter and last_filter.panel:bottom() or 0,
 		w = self.custom.filter_list:w(),
-		h = 30		
+		h = self._filter_list_h
 	})
 	
 	local custom_filter = filter:rect({
@@ -784,7 +852,7 @@ function ProfileReborn:create_filter_ui(name, key)
 		layer = 1,
 		alpha = 0,
 		w = self.custom.filter_list:w(),
-		h = 30
+		h = self._filter_list_h
 	})
 	
 	custom_filter:set_center_x(self.custom.filter_list:w() / 2)
@@ -816,33 +884,37 @@ function ProfileReborn:mouse_moved(o, x, y)
 	self._mouse_x = x
 	self._mouse_y = y
 	self._mouse_inside = false
-	self._touch_profile = false	
-	self._touch_ui = false
+	self._touch_profile = nil	
+	self._touch_ui = nil
 	
-	if self._panel:inside(self._mouse_x, self._mouse_y) then
-		for idx, box in pairs(self._ui.profile) do
-			local profile = self._ui.profile[idx]
-			if box:inside(self._mouse_x, self._mouse_y) and self._mouse_y > self._panel:y() and self._mouse_y < (self._panel:y() + self._panel:h()) then
-				self._mouse_inside = true
-				self._touch_profile = box:layer() == 0 and idx or box:layer()
-				self._touch_ui = idx
-				profile:child("top_line" .. idx):show()
-				profile:child("bottom_line" .. idx):show()
-				profile:child("left_line" .. idx):show()
-				profile:child("right_line" .. idx):show()
-				
-				if self._current_filter == 3 then
-					profile:child("remove_icon" .. idx):show()
-				end
-			else
-				profile:child("top_line" .. idx):hide()
-				profile:child("bottom_line" .. idx):hide()
-				profile:child("left_line" .. idx):hide()
-				profile:child("right_line" .. idx):hide()
-				profile:child("remove_icon" .. idx):hide()
+	-- if self._panel:inside(self._mouse_x, self._mouse_y) then
+	for idx, box in pairs(self._ui.profile) do
+		local profile = self._ui.profile[idx]
+		if box:inside(self._mouse_x, self._mouse_y) and self._mouse_y > self._panel:y() and self._mouse_y < (self._panel:y() + self._panel:h()) then
+			self._mouse_inside = true
+			self._touch_profile = box:layer() == 0 and idx or box:layer()
+			self._touch_ui = idx
+			profile:child("top_line" .. idx):show()
+			profile:child("bottom_line" .. idx):show()
+			profile:child("left_line" .. idx):show()
+			profile:child("right_line" .. idx):show()
+			
+			if self._current_filter == 3 then
+				profile:child("remove_icon" .. idx):show()
+				profile:child("up_icon" .. idx):show()
+				profile:child("down_icon" .. idx):show()
 			end
+		else
+			profile:child("top_line" .. idx):hide()
+			profile:child("bottom_line" .. idx):hide()
+			profile:child("left_line" .. idx):hide()
+			profile:child("right_line" .. idx):hide()
+			profile:child("remove_icon" .. idx):hide()
+			profile:child("up_icon" .. idx):hide()
+			profile:child("down_icon" .. idx):hide()
 		end
 	end
+	-- end
 	
 	-- filter arrow
 	if self._filter:child("arrow_left"):inside(x, y) or self._filter:child("arrow_right"):inside(x, y) then
@@ -890,6 +962,24 @@ function ProfileReborn:mouse_moved(o, x, y)
 				panel:set_alpha(0.5)
 			end
 		end
+		
+		local profile = self._ui.profile[self._touch_ui]
+		
+		if profile and profile:inside(x, y) then
+			local little_icons = {
+				profile:child("remove_icon" .. self._touch_ui),
+				profile:child("up_icon" .. self._touch_ui),
+				profile:child("down_icon" .. self._touch_ui)
+			}
+			
+			for _, icon in ipairs(little_icons) do
+				if icon:inside(x, y) then
+					icon:set_alpha(1)
+				else
+					icon:set_alpha(0.5)
+				end
+			end
+		end
 	end
 	
 	if self._mouse_inside then
@@ -907,14 +997,8 @@ function ProfileReborn:mouse_moved(o, x, y)
 end
 
 function ProfileReborn:mouse_pressed(o, button, x, y)
-	if self._rect:inside(x, y) then
-		if button == Idstring("mouse wheel down") then
-			self:wheel_scroll_bd(-self._wheel_scroll_value)
-		elseif button == Idstring("mouse wheel up") then
-			self:wheel_scroll_bd(self._wheel_scroll_value)
-		end
-	end
-	
+	local ccf = self.custom.current_custom_filter
+
 	if button == Idstring("mouse wheel down") then
 		if self._rect:inside(x, y) then
 			self:wheel_scroll_bd(-self._wheel_scroll_value)
@@ -922,6 +1006,10 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		
 		if self.deck_list and self.deck_list:inside(x, y) then
 			self:wheel_scroll_perk(-self.deck_list:w())
+		end
+		
+		if self._current_filter == 3 and self.custom.filter_list:inside(x, y) then
+			self:wheel_scroll_custom(-self._wheel_scroll_value_custom)
 		end
 	elseif button == Idstring("mouse wheel up") then
 		if self._rect:inside(x, y) then
@@ -931,20 +1019,42 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		if self.deck_list and self.deck_list:inside(x, y) then
 			self:wheel_scroll_perk(self.deck_list:w())
 		end
+		
+		if self._current_filter == 3 and self.custom.filter_list:inside(x, y) then
+			self:wheel_scroll_custom(self._wheel_scroll_value_custom)
+		end
 	end
 	
 	if button == Idstring("0") then
 		if self._touch_profile then
 			local profile = self._ui.profile[self._touch_ui]
-			if self._current_filter == 3 and profile:child("remove_icon" .. self._touch_ui):inside(x, y) then
-				local filters = self:get_current_custom_filter()
-				local profiles = filters.profiles
+			if self._current_filter == 3 then
+				if profile:child("remove_icon" .. self._touch_ui):inside(x, y) then
+					local current_filter = self:get_current_custom_filter()
+					local profiles = current_filter.profiles
 
-				table.remove(profiles, self._touch_ui)
-				self:reset_custom(self.custom.current_custom_filter, filters)			
-				
-				-- table.remove(self.profile, self._touch_ui)
-				
+					table.remove(profiles, self._touch_ui)
+					self:switch_filter(3, ccf)
+				elseif profile:child("up_icon" .. self._touch_ui):inside(x, y) then
+					if self._touch_ui > 1 then
+						local f = self._touch_ui
+						local t = self._touch_ui - 1
+						
+						self:swap_profile(f, t)
+						self:switch_filter(3, ccf)
+					end
+				elseif profile:child("down_icon" .. self._touch_ui):inside(x, y) then
+					if self._touch_ui < #self._ui.profile then
+						local f = self._touch_ui
+						local t = self._touch_ui + 1
+						
+						self:swap_profile(f, t)
+						self:switch_filter(3, ccf)
+					end
+				else
+					managers.multi_profile:set_current_profile(self._touch_profile)
+					self:hide()
+				end
 			else
 				managers.multi_profile:set_current_profile(self._touch_profile)
 				self:hide()			
@@ -1050,7 +1160,25 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 					self:start_input(true)
 				else
 					self:dialog_please_create_a_filter()
-				end				
+				end
+			elseif self.custom.tool_list:child("tool_icon_up"):inside(x, y) then
+				if #self.custom.filters > 0 then
+					if ccf > 1 then
+						self:swap_filter(ccf, ccf - 1)
+						self:switch_filter(3, ccf-1)
+					end
+				else
+					self:dialog_please_create_a_filter()
+				end
+			elseif self.custom.tool_list:child("tool_icon_down"):inside(x, y) then
+				if #self.custom.filters > 0 then
+					if ccf < #self.custom.filters then
+						self:swap_filter(ccf, ccf + 1)
+						self:switch_filter(3, ccf + 1)
+					end
+				else
+					self:dialog_please_create_a_filter()
+				end
 			elseif self.custom.tool_list:child("tool_icon_remove_filter"):inside(x, y) then
 				if #self.custom.filters > 0 then
 					local dialog_data = {
@@ -1061,13 +1189,13 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 					local yes_button = {
 						text = managers.localization:text("dialog_yes"),
 						callback_func = function()
-							table.remove(self.custom.filters, self.custom.current_custom_filter)
+							table.remove(self.custom.filters, ccf)
 							
-							if (self.custom.current_custom_filter - 1) <= 0 then
-								if self.custom.current_custom_filter + 1 > #self.custom.filters then
-									self.custom.current_custom_filter = 0
+							if (ccf - 1) <= 0 then
+								if ccf + 1 > #self.custom.filters then
+									ccf = 0
 								else
-									self.custom.current_custom_filter = self.custom.current_custom_filter + 1
+									ccf = ccf + 1
 								end
 							end
 							
@@ -1098,29 +1226,35 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			--##SetCustom
 			for num, filter in ipairs(self.custom.filters) do
 				if filter.panel:inside(x, y) then
-					self:reset_custom(num, filter)
+					self:switch_filter(3, num)
 				end
 			end
 		end
 	end
 end
 
-function ProfileReborn:reset_custom(num, filter)
-	self.custom.filters[self.custom.current_custom_filter].panel:child("custom_filter_rect"):set_alpha(0)
-	filter.panel:child("custom_filter_rect"):set_alpha(0.75)
-	self.custom.current_custom_filter = num
+function ProfileReborn:swap_profile(index1, index2)
+	local profiles = self.custom.filters[self.custom.current_custom_filter].profiles
+	
+	local idx1 = profiles[index1].idx
+	local idx2 = profiles[index2].idx
+	
+	profiles[index1], profiles[index2] = profiles[index2], profiles[index1]
+	
+	profiles[index1].idx = idx2
+	profiles[index2].idx = idx1
+end
 
-	self._panel:remove(self._ui_panel)
-	self._ui_panel = self._panel:panel()
-	self._ui.profile = {}
-	self.profile = {}
-					
-	if self.custom.filters[num] then
-		for key, data in pairs(self.custom.filters[num].profiles) do
-			self.profile[key] = data.profile
-			self:set_profile(self._ui.profile, key, data.profile, data.idx)
-		end
-	end
+function ProfileReborn:swap_filter(index1, index2)
+	local filters = self.custom.filters
+	
+	local key1 = filters[index1].key
+	local key2 = filters[index2].key
+	
+	filters[index1], filters[index2] = filters[index2], filters[index1]
+	
+	filters[index1].key = key1
+	filters[index2].key = key2
 end
 
 function ProfileReborn:get_current_custom_filter()
@@ -1163,7 +1297,9 @@ function ProfileReborn:key_release(o, k)
 	end
 end
 
-function ProfileReborn:switch_filter(value, custom_switch)
+function ProfileReborn:switch_filter(value, base_filter)
+	self:save()
+	
 	if value <= 0 then
 		value = 1
 	elseif value >= #self.filter_method + 1 then
@@ -1178,17 +1314,16 @@ function ProfileReborn:switch_filter(value, custom_switch)
 	elseif value == 2 then
 		self:set_perk_desk_profile()
 	elseif value == 3 then
-		if not custom_switch then
-			self:set_custom_profile()
-		end
+		self:set_custom_profile(base_filter)
 	end
 	
+
 	if self._bg_h * #self._ui.profile >= self._panel:h() then
 		local current_ui
 		if self._current_filter ~= 1 then
-			for idx, ui in ipairs(self._ui.profile) do
+			for k, ui in ipairs(self._ui.profile) do
 				if ui:layer() == managers.multi_profile._global._current_profile then
-					current_ui = idx
+					current_ui = k
 					break
 				end
 			end
@@ -1196,10 +1331,9 @@ function ProfileReborn:switch_filter(value, custom_switch)
 			current_ui = managers.multi_profile._global._current_profile
 		end
 
-		if self._ui.profile[current_ui]:y() > (self._panel:h() / 2 - self._bg_h / 2) then
+		if self._ui.profile[current_ui] and self._ui.profile[current_ui]:y() > (self._panel:h() / 2 - self._bg_h / 2) then
 			local dy = self._ui.profile[current_ui]:y() - (self._panel:h() / 2 - self._bg_h / 2)
 			self:wheel_scroll_bd(-dy)
-			self:wheel_scroll_bd(-self._wheel_scroll_value)
 		end
 	end
 	
@@ -1215,7 +1349,6 @@ function ProfileReborn:switch_perk(perk)
 		self:reset_panel()
 	
 		for i = 1, #profile do
-			self.profile[i] = profile[i]
 			self:set_profile(self._ui.profile, i, profile[i].profile, profile[i].idx)
 		end
 		
@@ -1235,17 +1368,12 @@ end
 
 function ProfileReborn:wheel_scroll_bd(dy)
 	local profiles = self._ui.profile
-	
+
 	if self._bg_h * #profiles >= self._panel:h() then
 		if dy > 0 then
-			local top = profiles[1]:top()
-			if top >= 0 or top + dy*2 > 0 then
-				dy = -profiles[1]:top()
-			end
+			dy = profiles[1]:top() >= 0 and -profiles[1]:top() or dy
 		else
-			local bottom = profiles[#profiles]:bottom()
-			
-			if bottom <= self._panel:h() or bottom + dy*2 <= self._panel:h() then
+			if profiles[#profiles]:bottom() + dy <= self._panel:h() then
 				dy = self._panel:h() - profiles[#profiles]:bottom()
 			end
 		end
@@ -1282,6 +1410,36 @@ function ProfileReborn:wheel_scroll_perk(dy)
 		
 		for _, data in ipairs(self.LeftList) do
 			data.bitmap:set_y(data.bitmap:y() + dy)
+		end
+	end
+end
+
+function ProfileReborn:wheel_scroll_custom(dy)
+	if self._filter_list_h * #self.custom.filters >= self.custom.filter_list:h() then
+		local minimum_filter
+		local last_filter
+		for _, child in ipairs(self.custom.filters) do
+			minimum_filter = self.custom.filters[1].panel
+			break
+		end
+		
+		for _, child in ipairs(self.custom.filters) do
+			last_filter = self.custom.filters[#self.custom.filters].panel
+			break
+		end
+		
+		if dy > 0 then
+			if minimum_filter:y() >= 0 then
+				dy = -minimum_filter:y()
+			end
+		else
+			if last_filter:bottom() - self._wheel_scroll_value_custom <= self._panel:h() then
+				dy = self._panel:h() - last_filter:bottom()
+			end			
+		end
+		
+		for _, data in ipairs(self.custom.filters) do
+			data.panel:set_y(data.panel:y() + dy)
 		end
 	end
 end
@@ -1369,7 +1527,7 @@ function ProfileReborn:handle_key(k, pressed)
 	local s, e = text:selection()
 	local n = utf8.len(text:text())
 	local d = math.abs(e - s)
-
+	
 	if pressed then
 		if k == Idstring("backspace") then
 			if s == e and s > 0 then
@@ -1433,7 +1591,8 @@ function ProfileReborn:save()
 	
 	local save_data = {
 		current_filter = self._current_filter,
-		custom = save_filters
+		custom = save_filters,
+		current_custom_filter = self.custom.current_custom_filter
 	}
 		
 	io.save_as_json(save_data, self.save_path)
