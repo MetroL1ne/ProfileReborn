@@ -1189,14 +1189,11 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 					local yes_button = {
 						text = managers.localization:text("dialog_yes"),
 						callback_func = function()
+							local max_filters = #self.custom.filters
 							table.remove(self.custom.filters, ccf)
 							
-							if (ccf - 1) <= 0 then
-								if ccf + 1 > #self.custom.filters then
-									ccf = 0
-								else
-									ccf = ccf + 1
-								end
+							if ccf == max_filters then
+								ccf = ccf - 1
 							end
 							
 							for k1, data in ipairs(self.custom.filters) do
@@ -1205,7 +1202,7 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 							
 							self:save()
 							
-							self:switch_filter(3)
+							self:switch_filter(3, ccf)
 						end
 					}
 					local no_button = {
