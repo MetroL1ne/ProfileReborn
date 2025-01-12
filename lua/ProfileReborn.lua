@@ -1227,6 +1227,7 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			for num, filter in ipairs(self.custom.filters) do
 				if filter.panel:inside(x, y) then
 					self:switch_filter(3, num)
+					break
 				end
 			end
 		end
