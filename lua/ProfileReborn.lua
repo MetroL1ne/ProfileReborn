@@ -3,6 +3,7 @@ ProfileReborn.save_path = SavePath .. "ProfileReborn.txt"
 
 local MPath = ModPath
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_none_icon"), MPath .. "assets/profile_rebvorn_none_icon.texture")
+DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_add_profile_icon"), MPath .. "assets/profile_rebvorn_add_profile_icon.texture")
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_loading_icon"), MPath .. "assets/profile_rebvorn_loading_icon.texture")
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_up_icon"), MPath .. "assets/profile_rebvorn_up_icon.texture")
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_down_icon"), MPath .. "assets/profile_rebvorn_down_icon.texture")
@@ -607,31 +608,44 @@ function ProfileReborn:set_custom_profile(base_filter)
 		end
 	end
 
-	if #self.custom.filters <= 0 then
-		local add_filter_icon = self.custom.panel:bitmap({
-			texture = "guis/textures/pd2/none_icon",
-			rotation = 45,
-		})
-		
-		local add_filter_text = self.custom.panel:text({
-			vertical = "center",
-			valign = "center",
-			align = "center",
-			halign = "center",
-			font = tweak_data.hud_players.ammo_font,
-			text = string.upper(managers.localization:text("menu_bp_center_text")),
-			font_size = 25
-		})
-		
-		local center_x = self._panel:w() / 2
-		local center_y = self._panel:h() / 2
-		add_filter_icon:set_center(center_x, center_y)
-		add_filter_text:set_center(center_x, center_y - 50)
-		
-		self.custom.first_panel = {
-			add_filter_icon,
-			add_filter_text
-		}
+	local add_filter_icon = self.custom.panel:bitmap({
+		texture = "guis/textures/pd2/none_icon",
+		rotation = 45,
+	})
+	
+	local add_first_filter= self.custom.panel:text({
+		name = "add_first_filter",
+		color = Color.black,
+		alpha = 0,
+		w = self._panel:w() * 0.8,
+		h = self._panel:h() * 0.8
+	})
+	
+	local add_filter_text = self.custom.panel:text({
+		vertical = "center",
+		valign = "center",
+		align = "center",
+		halign = "center",
+		font = tweak_data.hud_players.ammo_font,
+		text = string.upper(managers.localization:text("menu_bp_center_text")),
+		font_size = 25
+	})
+	
+	local center_x = self._panel:w() / 2
+	local center_y = self._panel:h() / 2
+	add_filter_icon:set_center(center_x, center_y)
+	add_first_filter:set_center(center_x, center_y)
+	add_filter_text:set_center(center_x, center_y - 50)
+	
+	self.custom.first_panel = {
+		add_filter_icon,
+		add_filter_text
+	}
+	
+	if #self.custom.filters > 0 then
+		for _, panel in ipairs(self.custom.first_panel) do
+			panel:hide()
+		end
 	end
 	
 	self.custom.tool_list = self._ws:panel():panel({
@@ -668,8 +682,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 	
 	local tool_icon_add_profile = tool_list:bitmap({
 		name = "tool_icon_add_profile",
-		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
-		rotation = 45,
+		texture = "guis/textures/pd2/profile_rebvorn_add_profile_icon",
 		color = tweak_data.screen_colors.text,
 		alpha = 0.5,
 		layer = 1,
@@ -731,8 +744,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 		tool_icon_remove_filter
 	}
 	
-	tool_icon_add_filter:set_center_x(tool_list:w() / 2 + 1)
-	tool_icon_add_profile:set_center_x(tool_list:w() / 2 + 1)
+	tool_icon_add_filter:set_center_x(tool_list:w() / 2 + 0.5)
+	tool_icon_add_profile:set_center_x(tool_list:w() / 2)
 	tool_icon_rename:set_center_x(tool_list:w() / 2)
 	tool_icon_up:set_center_x(tool_list:w() / 2)
 	tool_icon_down:set_center_x(tool_list:w() / 2)
@@ -935,7 +948,7 @@ function ProfileReborn:mouse_moved(o, x, y)
 	
 	-- ##NewFilter
 	if self._current_filter == 3 then
-		if #self.custom.filters <=0 and self._ui_panel:inside(x, y) then
+		if #self.custom.filters <=0 and self.custom.panel:child("add_first_filter"):inside(x, y) then
 			self._mouse_inside = true
 		end
 
@@ -997,6 +1010,10 @@ function ProfileReborn:mouse_moved(o, x, y)
 end
 
 function ProfileReborn:mouse_pressed(o, button, x, y)
+	if self._selected then
+		return
+	end
+	
 	local ccf = self.custom.current_custom_filter
 
 	if button == Idstring("mouse wheel down") then
@@ -1078,13 +1095,13 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		
 		if self._current_filter == 3 then
 			--##NewCustom
-			if #self.custom.filters <=0 and self._ui_panel:inside(x, y) then
+			if #self.custom.filters <= 0 and self.custom.panel:child("add_first_filter"):inside(x, y) then
 				self:start_input()
 				managers.mouse_pointer:set_pointer_image("arrow")
 				
-				for _, panel in ipairs(self.custom.first_panel) do
-					self.custom.panel:remove(panel)
-				end
+				-- for _, panel in ipairs(self.custom.first_panel) do
+					-- self.custom.panel:remove(panel)
+				-- end
 			end
 			
 			if self.custom.tool_list:child("tool_icon_add_filter"):inside(x, y) then
@@ -1116,6 +1133,7 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 							text = text,
 							callback_func = function ()
 								self:add_profile_callback(profile, idx)
+								self._selected = false
 							end,
 							focus_callback_func = function ()
 							end
@@ -1132,6 +1150,9 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 					local no_button = {
 						text = managers.localization:text("dialog_cancel"),
 						focus_callback_func = function ()
+						end,
+						callback_func = function ()
+							self._selected = false
 						end,
 						cancel_button = true
 					}
@@ -1150,8 +1171,16 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 					dialog_data.text_formating_color = Color.white
 					dialog_data.text_formating_color_table = {}
 					dialog_data.clamp_to_screen = true
-
+					
 					managers.system_menu:show_buttons(dialog_data)
+					
+					self._selected = true
+					
+					if #self.custom.filters > 0 then
+						for _, panel in ipairs(self.custom.first_panel) do
+							panel:hide()
+						end
+					end
 				else
 					self:dialog_please_create_a_filter()
 				end
@@ -1203,11 +1232,16 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 							self:save()
 							
 							self:switch_filter(3, ccf)
+							
+							self._selected = false
 						end
 					}
 					local no_button = {
 						text = managers.localization:text("dialog_cancel"),
-						cancel_button = true
+						cancel_button = true,
+						callback_func = function()
+							self._selected = false
+						end
 					}
 					dialog_data.button_list = {
 						yes_button,
@@ -1215,6 +1249,14 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 					}
 
 					managers.system_menu:show(dialog_data)
+					
+					self._selected = true
+					
+					if #self.custom.filters <= 0 then
+						for _, panel in ipairs(self.custom.first_panel) do
+							panel:show()
+						end
+					end
 				else
 					self:dialog_please_create_a_filter()
 				end
@@ -1270,6 +1312,10 @@ function ProfileReborn:mouse_clicked(o, button, x, y)
 end
 
 function ProfileReborn:key_press(o, k)
+	-- if self._selected then
+		-- return
+	-- end
+	
 	local mouse_callbacks = managers.mouse_pointer._mouse_callbacks
 	if mouse_callbacks and mouse_callbacks[#mouse_callbacks] and mouse_callbacks[#mouse_callbacks].id ~= self._mouse_id then
 		self._key_release_disable = true
@@ -1281,6 +1327,10 @@ function ProfileReborn:key_press(o, k)
 end
 
 function ProfileReborn:key_release(o, k)
+	if self._selected then
+		return
+	end
+	
 	if self._key_release_disable then
 		self._key_release_disable = false
 		return
@@ -1449,13 +1499,19 @@ function ProfileReborn:dialog_please_create_a_filter()
 	}
 	
 	local ok_button = {
-		text = managers.localization:text("dialog_ok")
+		text = managers.localization:text("dialog_ok"),
+		cancel_button = true,
+		callback_func = function()
+			self._selected = false
+		end
 	}
 	dialog_data.button_list = {
 		ok_button
 	}
 
-	managers.system_menu:show(dialog_data)	
+	managers.system_menu:show(dialog_data)
+	
+	self._selected = true
 end
 
 function ProfileReborn:start_input(is_rename)
