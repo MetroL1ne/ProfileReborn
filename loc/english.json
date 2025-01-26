@@ -6,5 +6,8 @@
 	"menu_bp_center_text" : "Click to create a new filter",
 	"menu_bp_enter_custom_name" : "Enter Name",
 	"menu_bp_dialog_remove_filter" : "Remove Filter",
-	"menu_bp_dialog_please_create_a_filter" : "Please create a filter>_<"
+	"menu_bp_dialog_please_create_a_filter" : "Please create a filter>_<",
+	
+	"menu_bp_perk_display_icon_1" : "Icon",
+	"menu_bp_perk_display_text" : "Text"
 }
