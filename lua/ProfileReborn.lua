@@ -14,6 +14,8 @@ function ProfileReborn:active()
 	self._wheel_scroll_value = 60
 	self._wheel_scroll_value_custom = 15
 	self._filter_list_h = 30
+	self._normal_color = Color.white
+	self._highlight_color = Color.yellow
 	
 	self._panel = self._ws:panel():panel({
 		layer = self._ui_layer,	
@@ -152,7 +154,7 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	local text = profile.name or "Profile " .. idx
 
 	if (profile_idx or idx) == managers.multi_profile._global._current_profile then
-		text = utf8.char(187) .. text
+		text = text
 	end
 	
 	ui_panel[idx] = self._ui_panel:panel({
@@ -260,9 +262,16 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	up_icon:set_bottom(panel:h()-5)
 	up_icon:set_right(down_icon:left())
 	
+	local text_color = self._normal_color
+	
+	if profile_idx == managers.multi_profile._global._current_profile then
+		text_color = self._highlight_color
+	end
+
 	local profile_text = panel:text({
 		font = tweak_data.hud_players.ammo_font,
 		text = text,
+		color = text_color,
 		font_size = 12,
 		layer = 3,
 		y = 5,
@@ -438,6 +447,8 @@ function ProfileReborn:show()
 		menu_ui_object = self
 	}
 	managers.mouse_pointer:use_mouse(self._mouse_data)
+	managers.menu:active_menu().input:set_back_enabled(false)
+	managers.menu:active_menu().input:accept_input(false)
 end
 
 function ProfileReborn:hide()
@@ -455,7 +466,9 @@ function ProfileReborn:hide()
 	
 	self._ws:hide()
 	managers.gui_data:destroy_workspace(self._ws)
-
+	managers.menu:active_menu().input:set_back_enabled(true)
+	managers.menu:active_menu().input:accept_input(true)
+	
 	self:save()
 end
 
@@ -972,7 +985,7 @@ end
 
 function ProfileReborn:set_default_profile()
 	for idx, profile in pairs(managers.multi_profile._global._profiles) do
-		self:set_profile(self._ui.profile, idx, profile)
+		self:set_profile(self._ui.profile, idx, profile, idx)
 	end
 end
 
@@ -1790,8 +1803,6 @@ function ProfileReborn:set_editing(editing)
 	self._input_panel:set_visible(editing)
 	
 	if editing then
-		managers.menu:active_menu().input:set_back_enabled(false)
-		managers.menu:active_menu().input:accept_input(false)
 		managers.menu:active_menu().input:set_force_input(false)
 		managers.menu:active_menu().input:deactivate_mouse()
 		managers.mouse_pointer:remove_mouse(self._mouse_data)
@@ -1806,8 +1817,6 @@ function ProfileReborn:set_editing(editing)
 		end
 	else
 		managers.menu:active_menu().input:activate_mouse()
-		managers.menu:active_menu().input:accept_input(true)
-		managers.menu:active_menu().input:set_back_enabled(true)
 		managers.mouse_pointer:use_mouse(self._mouse_data)
 		self._input_panel:enter_text(nil)
 		self._name_text:set_text("")
