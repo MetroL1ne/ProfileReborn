@@ -1,8 +1,9 @@
 # Change log
 **1.012**
-- Change the icon of 'CREW CHIEF' to the last one on the deck card
-- Optimize the icon display of 'COPYCAT'
-  
+- Change the icon of "CREW CHIEF" to the last one on the deck card
+- Optimize the icon display of "COPYCAT"
+- Fixed an issue, When switching the "perk deck" filter, it will result in multiple displays of the same profile
+
 **1.011**
 - Change the currently selected Profile from ">>" to "Color Highlight"
 - Fix issues related to ESC back
