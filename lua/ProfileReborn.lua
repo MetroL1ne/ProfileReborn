@@ -178,7 +178,12 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	local perk_deck = tweak_data.skilltree.specializations[profile.perk_deck]
 
 	if perk_deck then
-		local icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[1])
+		local icon_atlas_texture, texture_rect, multi_choice_icon = self:get_specialization_icon(perk_deck[1])
+		
+		if profile.perk_deck == 23 then
+			icon_atlas_texture, texture_rect, multi_choice_icon = self:get_specialization_icon(perk_deck[9], profile.perk_deck_choices[9])
+		end
+
 		local profile_icon_bg = panel:bitmap({
 			texture = icon_atlas_texture,
 			texture_rect = texture_rect,
@@ -188,6 +193,24 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 			h = profile_bg:h() * 0.5
 		})
 		profile_icon_bg:set_right(profile_bg:right())
+		
+		if profile.perk_deck == 23 then
+			profile_icon_bg:set_w(profile_bg:h() * 0.45)
+			profile_icon_bg:set_h(profile_bg:h() * 0.45)
+			profile_icon_bg:set_right(profile_bg:right())
+
+			local profile_icon_23_bg = panel:bitmap({
+				texture = multi_choice_icon.texture,
+				texture_rect = multi_choice_icon.texture_rect,
+				alpha = 0.3,
+				layer = 2,
+				w = profile_bg:h() * 0.3,
+				h = profile_bg:h() * 0.3
+			})
+			
+			profile_icon_23_bg:set_top(profile_icon_bg:bottom()-profile_icon_23_bg:w()/3)
+			profile_icon_23_bg:set_center_x(profile_icon_bg:center_x())
+		end
 	end
 	
 	local top_line = panel:rect({
@@ -990,6 +1013,7 @@ function ProfileReborn:set_default_profile()
 end
 
 function ProfileReborn:set_perk_desk_profile()
+	self.perk_deck.perks = {}
 	for idx, profile in pairs(managers.multi_profile._global._profiles) do
 		self.perk_deck.perks[profile.perk_deck] = self.perk_deck.perks[profile.perk_deck] or {}
 		local perk_deck = self.perk_deck.perks[profile.perk_deck]
@@ -1044,6 +1068,13 @@ function ProfileReborn:set_perk_desk_profile()
 		if perk_deck then
 			-- display_mode 1
 			local icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[1])
+			
+			if perk == 1 then
+				icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[9])
+			elseif perk == 23 then
+				icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[9])
+			end
+			
 			local last_panel = deck_list_icon:child("perk_icon_" .. tostring(last_perk))
 				
 			local perk_icon = deck_list_icon:bitmap({
@@ -1923,7 +1954,7 @@ end
 
 -- GETING
 
-function ProfileReborn:get_specialization_icon(item)
+function ProfileReborn:get_specialization_icon(item, perk_deck_choices)
 	local guis_catalog = "guis/"
 
 	if item.texture_bundle_folder then
@@ -1948,8 +1979,47 @@ function ProfileReborn:get_specialization_icon(item)
 		icon_texture_rect[3],
 		icon_texture_rect[4]
 	}
+
+	local multi_choice_data = item.multi_choice
+	local multi_choice_icon = {}
 	
-	return icon_atlas_texture, texture_rect
+	if multi_choice_data then
+		multi_choice_data = multi_choice_data[perk_deck_choices] or nil
+
+		if multi_choice_data then
+			local atlas_name = multi_choice_data.icon_atlas or multi_choice_data.texture_bundle_folder and "icons_atlas"
+
+			if atlas_name then
+				local choice_guis_catalog = "guis/"
+
+				if multi_choice_data.texture_bundle_folder then
+					choice_guis_catalog = choice_guis_catalog .. "dlcs/" .. tostring(multi_choice_data.texture_bundle_folder) .. "/"
+				end
+
+				local choice_icon_atlas_texture = choice_guis_catalog .. "textures/pd2/specialization/" .. atlas_name
+				local choice_texture_rect_x = multi_choice_data.icon_xy and multi_choice_data.icon_xy[1] or 0
+				local choice_texture_rect_y = multi_choice_data.icon_xy and multi_choice_data.icon_xy[2] or 0
+				local choice_icon_texture_rect = multi_choice_data.icon_texture_rect or {
+					64,
+					64,
+					64,
+					64
+				}
+				
+				multi_choice_icon = {
+					texture = choice_icon_atlas_texture,
+					texture_rect = {
+						choice_texture_rect_x * choice_icon_texture_rect[1],
+						choice_texture_rect_y * choice_icon_texture_rect[2],
+						choice_icon_texture_rect[3],
+						choice_icon_texture_rect[4]
+					}
+				}
+			end
+		end
+	end
+
+	return icon_atlas_texture, texture_rect, multi_choice_icon
 end
 
 function ProfileReborn:get_projectiles_icon(grenade)
