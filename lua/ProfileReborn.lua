@@ -295,7 +295,7 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		font = tweak_data.hud_players.ammo_font,
 		text = text,
 		color = text_color,
-		font_size = 12,
+		font_size = 14,
 		layer = 3,
 		y = 5,
 		x = 3
@@ -369,7 +369,7 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		vertical = "top",
 		font = tweak_data.hud_players.ammo_font,
 		text = skillpoint_text,
-		font_size = 12,
+		font_size = 13,
 		layer = 3,
 		x = secondary_weapon:left()
 	})		
