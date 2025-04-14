@@ -1,4 +1,12 @@
 # Change log
+**1.013**
+- Changed the font size of the Profile name 12 >> 14
+- Changed the font size of the Profile Skill Tree display 12 >> 13
+- Reduce the transparency of the 'Custom' tool list 0.6 >> 0.3
+- Fixed the issue of crashes caused by not installing "BeardLib"
+- Fixed the issue of crashes caused by conflicts with the "FreeFlightCamera" mod
+- Fixed a layer issue
+
 **1.012**
 - Change the icon of "CREW CHIEF" to the last one on the deck card
 - Optimize the icon display of "COPYCAT"
