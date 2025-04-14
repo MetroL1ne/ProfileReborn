@@ -10,7 +10,7 @@ DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn
 
 function ProfileReborn:active()
 	self._ws = managers.gui_data:create_fullscreen_workspace()
-	self._ui_layer = 100
+	self._ui_layer = 500
 	self._wheel_scroll_value = 60
 	self._wheel_scroll_value_custom = 15
 	self._filter_list_h = 30
@@ -449,10 +449,6 @@ end
 function ProfileReborn:show()
 	self._bg:show()
 	self._panel:show()
-	
-	if game_state_machine then
-		game_state_machine:current_state():set_controller_enabled(not managers.player:player_unit())
-	end
 		
 	local active_menu = managers.menu:active_menu()
 	local is_pc_controller = managers.menu:is_pc_controller()
@@ -470,16 +466,19 @@ function ProfileReborn:show()
 		menu_ui_object = self
 	}
 	managers.mouse_pointer:use_mouse(self._mouse_data)
+
+	local controller = managers.controller:get_controller_by_name("MenuManager")
+	
+	if controller then
+		controller:set_enabled(false)
+	end
+	
 	managers.menu:active_menu().input:set_back_enabled(false)
 	managers.menu:active_menu().input:accept_input(false)
 end
 
 function ProfileReborn:hide()
 	managers.mouse_pointer:remove_mouse(self._mouse_data)
-	
-    if game_state_machine then
-		game_state_machine:current_state():set_controller_enabled(true)
-    end
 	
 	local active_menu = managers.menu:active_menu()
 	local is_pc_controller = managers.menu:is_pc_controller()
@@ -489,6 +488,13 @@ function ProfileReborn:hide()
 	
 	self._ws:hide()
 	managers.gui_data:destroy_workspace(self._ws)
+	
+	local controller = managers.controller:get_controller_by_name("MenuManager")
+	
+	if controller then
+		controller:set_enabled(true)
+	end
+	
 	managers.menu:active_menu().input:set_back_enabled(true)
 	managers.menu:active_menu().input:accept_input(true)
 	
@@ -1025,13 +1031,13 @@ function ProfileReborn:set_perk_desk_profile()
 	
 	
 	self.perk_deck.deck_list.icon = self._ws:panel():panel({
-		layer = 100,
+		layer = self._ui_layer + 1,
 		w = 50,
 		h = self._panel:h()
 	})
 	
 	self.perk_deck.deck_list.text = self._ws:panel():panel({
-		layer = 100,
+		layer = self._ui_layer + 1,
 		w = 200,
 		h = self._panel:h()
 	})
@@ -1218,7 +1224,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 	local filters = self.custom.filters
 	
 	self.custom.filter_list = self._ws:panel():panel({
-		layer = 100,
+		layer = self._ui_layer,
 		w = 200,
 		h = self._panel:h()
 	})
@@ -1319,7 +1325,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 		name = "tool_list_rect",
 		color = Color.black,
 		layer = -50,
-		alpha = 0.6,
+		alpha = 0.3,
 		w = tool_list:w(),
 		h = tool_list:h()
 	})
