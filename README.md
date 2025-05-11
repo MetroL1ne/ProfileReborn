@@ -1,4 +1,16 @@
 # Change log
+**1.02**
+- Added new Perk Deck filter display method to sort text by character
+- Added a preview only scrollbar
+- Changed the skill count to always display as two digits / by Nexqua
+- Changed Profile Name highlight color to main color
+- Change the highlight color of the filter selector panel
+- Fixed the issue of default Profile Name index numbers
+- Fixed the issue of duplicate perk icons for "Crew Chief" and "Muscle" in the Profile List
+- Fixed some input issues in custom filter when selecting to add a profile
+- Fixed the issue in custom filter of resetting the position of the left list when switching
+- Some optimizations, Removed some useless variable
+
 **1.013**
 - Changed the font size of the Profile name 12 >> 14
 - Changed the font size of the Profile Skill Tree display 12 >> 13
