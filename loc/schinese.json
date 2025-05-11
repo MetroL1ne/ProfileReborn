@@ -6,8 +6,9 @@
 	"menu_bp_center_text" : "创建新的筛选器",
 	"menu_bp_enter_custom_name" : "输入名称",
 	"menu_bp_dialog_remove_filter" : "删除筛选器",
-	"menu_bp_dialog_please_create_a_filter" : "请创建筛选器>_<"
+	"menu_bp_dialog_please_create_a_filter" : "请创建筛选器>_<",
 	
 	"menu_bp_perk_display_icon_1" : "图标",
-	"menu_bp_perk_display_text" : "文字"
+	"menu_bp_perk_display_text" : "文字",
+	"menu_bp_perk_display_text_sort" : "文字排序"
 }
