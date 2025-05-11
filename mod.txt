@@ -2,7 +2,7 @@
 	"name" : "Profile Reborn",
 	"description" : "",
 	"author" : "MetroLine",   
-	"version" : "1.013",
+	"version" : "1.02",
 	"blt_version": 2,
 	"hooks" : [
 		{

@@ -9,5 +9,6 @@
 	"menu_bp_dialog_please_create_a_filter" : "Please create a filter>_<",
 	
 	"menu_bp_perk_display_icon_1" : "Icon",
-	"menu_bp_perk_display_text" : "Text"
+	"menu_bp_perk_display_text" : "Text",
+	"menu_bp_perk_display_text_sort" : "Sorted Text"
 }
