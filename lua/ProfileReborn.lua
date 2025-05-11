@@ -1,4 +1,4 @@
-ProfileReborn = ProfileReborn or {}
+ProfileReborn = ProfileReborn or class()
 ProfileReborn.save_path = SavePath .. "ProfileReborn.txt"
 
 local MPath = ModPath
@@ -8,15 +8,48 @@ DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_up_icon"), MPath .. "assets/profile_rebvorn_up_icon.texture")
 DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn_down_icon"), MPath .. "assets/profile_rebvorn_down_icon.texture")
 
+function ProfileReborn:init()
+	self._ui_layer = 500  --整体UI的层级
+	self._wheel_scroll_value = 60  --浏览下拉Profile列表的速度
+	self._wheel_scroll_value_custom = 15  --左列表文字系列的下拉速度
+	self._filter_list_h = 30  --左文字列表的高度
+	self._bg_h = 100  --Profile显示的高度
+	self._max_length = 15  --Custom筛选器输入命名的最大长度
+
+	self._normal_text_color = Color.white  --主题文字颜色
+	self._profile_name_color = self._normal_text_color  --Profile名称的颜色
+	self._profile_skillpoints_text_color = self._normal_text_color  --Profile技能显示的颜色
+	self._perk_deck_display_method_text_color = self._normal_text_color  --Perk Deck筛选器切换显示方式的颜色
+	self._filter_method_font_color = self._normal_text_color  --切换筛选器的文字颜色
+	self._leftlist_font_color = self._normal_text_color  --左列表文字显示的颜色
+	self._new_add_filter_text_color = self._normal_text_color  --Custom筛选器背景文字 ‘创建新的筛选器’ 的颜色
+
+	self._main_color = Color(173 / 255,216 / 255,230 / 255)  --主题颜色
+	self._leftlist_text_bg_color = self._main_color  --左文字列表的选中时的背景颜色
+	self._filter_bg_color = self._main_color  --选中切换筛选器时的背景颜色
+	self._profile_highlight_color = self:Saturation(self._main_color)  --当前使用的Profile的颜色
+
+	--筛选器列表
+	self.filter_method = {
+		"default",
+		"perk_deck",
+		"custom"
+	}
+	
+	--Perk Deck筛选器显示方式列表
+	self.perk_deck_display_method = {
+		"icon_1",
+		"text",
+		"text_sort"
+	}
+
+	--初始化记录鼠标指针位置
+	self._mouse_x = 0
+	self._mouse_y = 0
+end
+
 function ProfileReborn:active()
 	self._ws = managers.gui_data:create_fullscreen_workspace()
-	self._ui_layer = 500
-	self._wheel_scroll_value = 60
-	self._wheel_scroll_value_custom = 15
-	self._filter_list_h = 30
-	self._normal_color = Color.white
-	self._highlight_color = Color.yellow
-	
 	self._panel = self._ws:panel():panel({
 		layer = self._ui_layer,	
 		w = 800,
@@ -63,17 +96,6 @@ function ProfileReborn:active()
 		}
 	})
 	
-	self.filter_method = {
-		"default",
-		"perk_deck",
-		"custom"
-	}
-	
-	self.perk_deck_display_method = {
-		"icon_1",
-		"text"
-	}
-	
 	for layer, method in ipairs(self.filter_method) do
 		self._filter:text({
 			name = "bp_filter_" .. method,
@@ -85,7 +107,8 @@ function ProfileReborn:active()
 			font = tweak_data.hud_players.ammo_font,
 			text = string.upper(managers.localization:text("menu_bp_filter_" .. method)),
 			font_size = 18,
-			layer = layer
+			layer = layer,
+			color = self._filter_method_font_color
 		})
 	end
 	
@@ -117,14 +140,22 @@ function ProfileReborn:active()
 		h = self._panel:h()
 	})
 	
+	--创建滚动条
+	self._scroll_bar = self._panel:rect({
+	    name = "scroll_bar",
+	    color = Color.white,
+	    visible = false,
+	    color = Color(0.5,0.5,0.5),
+		layer = -1
+	})
+	self._scroll_bar:set_w(2)
+
 	self:create_side(self._panel)
 	self:create_side(self._filter)
 	
 	self._ui = {}
 	self._ui.profile = {}
 	self.profile = {}
-	self._bg_h = 100
-	self._max_length = 15
 	self.perk_deck = {}
 	self.perk_deck.perks = {}
 	self.perk_deck.deck_list = {}
@@ -135,8 +166,6 @@ function ProfileReborn:active()
 	
 	self:switch_filter(self._current_filter)
 
-	self._mouse_x = 0
-	self._mouse_y = 0
 	self._ws:connect_keyboard(Input:keyboard())
 	self._panel:key_press(callback(self, self, "key_press"))
 	self._panel:key_release(callback(self, self, "key_release"))
@@ -151,7 +180,7 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	
 	self.profile[idx] = profile
 	
-	local text = profile.name or "Profile " .. idx
+	local text = profile.name or "Profile " .. profile_idx or idx
 
 	if (profile_idx or idx) == managers.multi_profile._global._current_profile then
 		text = text
@@ -180,7 +209,9 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	if perk_deck then
 		local icon_atlas_texture, texture_rect, multi_choice_icon = self:get_specialization_icon(perk_deck[1])
 		
-		if profile.perk_deck == 23 then
+		if profile.perk_deck == 1 then
+			icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[9])		
+		elseif profile.perk_deck == 23 then
 			icon_atlas_texture, texture_rect, multi_choice_icon = self:get_specialization_icon(perk_deck[9], profile.perk_deck_choices[9])
 		end
 
@@ -285,10 +316,10 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	up_icon:set_bottom(panel:h()-5)
 	up_icon:set_right(down_icon:left())
 	
-	local text_color = self._normal_color
+	local text_color = self._profile_name_color
 	
 	if profile_idx == managers.multi_profile._global._current_profile then
-		text_color = self._highlight_color
+		text_color = self._profile_highlight_color
 	end
 
 	local profile_text = panel:text({
@@ -358,12 +389,17 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		secondary_weapon_bg:set_center_y(secondary_weapon:center_y())
 	end
 	
+	-- Skillpoints 1.02 fix by Nexqua
+	local function pad(num)
+		return string.format("%02d", num)
+	end
+	
 	local skillpoints = self:get_skillpoints_base(idx)
-	local mas_skillpoints = "Mas:" .. skillpoints[1] .. " " .. skillpoints[2] .. " " .. skillpoints[3]
-	local enf_skillpoints = "Enf:" .. skillpoints[4] .. " " .. skillpoints[5] .. " " .. skillpoints[6]
-	local tec_skillpoints = "Tec:" .. skillpoints[7] .. " " .. skillpoints[8] .. " " .. skillpoints[9]
-	local gho_skillpoints = "Gho:" .. skillpoints[10] .. " " .. skillpoints[11] .. " " .. skillpoints[12]
-	local fug_skillpoints = "Fug:" .. skillpoints[13] .. " " .. skillpoints[14] .. " " .. skillpoints[15]
+	local mas_skillpoints = "Mas:" .. pad(skillpoints[1]) .. " " .. pad(skillpoints[2]) .. " " .. pad(skillpoints[3])
+	local enf_skillpoints = "Enf:" .. pad(skillpoints[4]) .. " " .. pad(skillpoints[5]) .. " " .. pad(skillpoints[6])
+	local tec_skillpoints = "Tec:" .. pad(skillpoints[7]) .. " " .. pad(skillpoints[8]) .. " " .. pad(skillpoints[9])
+	local gho_skillpoints = "Gho:" .. pad(skillpoints[10]) .. " " .. pad(skillpoints[11]) .. " " .. pad(skillpoints[12])
+	local fug_skillpoints = "Fug:" .. pad(skillpoints[13]) .. " " .. pad(skillpoints[14]) .. " " .. pad(skillpoints[15])
 	local skillpoint_text = mas_skillpoints .. "   " .. enf_skillpoints .. "   " .. tec_skillpoints .. "   " .. gho_skillpoints .. "   " .. fug_skillpoints
 	local skillpoints_text = panel:text({
 		vertical = "top",
@@ -371,7 +407,8 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		text = skillpoint_text,
 		font_size = 13,
 		layer = 3,
-		x = secondary_weapon:left()
+		x = secondary_weapon:left(),
+		color = self._profile_skillpoints_text_color
 	})		
 	local throwable = profile.throwable
 	local texture = self:get_projectiles_icon(throwable)
@@ -502,11 +539,7 @@ function ProfileReborn:hide()
 end
 
 function ProfileReborn:reset_panel()
-	self._panel:remove(self._ui_panel)
-	
-	self._ui_panel = self._panel:panel()
-	self._ui.profile = {}
-	self.profile = {}
+	self:reset_profile_panels()
 	
 	--remove PerkDeck filter
 	if self._current_filter ~= 2 then
@@ -518,6 +551,11 @@ function ProfileReborn:reset_panel()
 		if self.perk_deck.deck_list.text then
 			self._ws:panel():remove(self.perk_deck.deck_list.text)
 			self.perk_deck.deck_list.text = nil
+		end
+		
+		if self.perk_deck.deck_list.text_sort then
+			self._ws:panel():remove(self.perk_deck.deck_list.text_sort)
+			self.perk_deck.deck_list.text_sort = nil
 		end
 		
 		self.perk_deck.current_perk = nil
@@ -539,7 +577,19 @@ function ProfileReborn:reset_panel()
 	self:save()
 end
 
+--重置所有和profile列表有关的内容
+function ProfileReborn:reset_profile_panels()
+	self._panel:remove(self._ui_panel)
+	self._ui_panel = self._panel:panel()
+	self._ui.profile = {}
+	self.profile = {}
+end
+
 function ProfileReborn:mouse_moved(o, x, y)
+	if self._editing then
+		return
+	end
+
 	if not self._panel then
 		return
 	end
@@ -588,8 +638,8 @@ function ProfileReborn:mouse_moved(o, x, y)
 	if self._current_filter == 2 then
 		if self.perk_deck.display_mode == 1 then
 			if self.perk_deck.deck_list.icon and self.perk_deck.deck_list.icon:inside(x, y) then
-				for _, data in ipairs(self.perk_deck.LeftList) do
-					if data.bitmap:inside(x, y) and data.id ~= self.perk_deck.current_perk then
+				for _, panel in ipairs(self.perk_deck.deck_list.icon:children()) do
+					if panel:inside(x, y) and panel:layer() ~= self.perk_deck.current_perk then
 						self._mouse_inside = true
 						break
 					end
@@ -604,6 +654,17 @@ function ProfileReborn:mouse_moved(o, x, y)
 					self._mouse_inside = true
 				else
 					child:child("text_perk_rect"):set_alpha(0)
+				end
+			end
+		elseif self.perk_deck.display_mode == 3 then
+			for _, child in pairs(self.perk_deck.deck_list.text_sort:children()) do
+				if child:layer() == self.perk_deck.current_perk then
+					child:child("text_sort_perk_rect"):set_alpha(0.75)
+				elseif child:inside(x, y) then
+					child:child("text_sort_perk_rect"):set_alpha(0.5)
+					self._mouse_inside = true
+				else
+					child:child("text_sort_perk_rect"):set_alpha(0)
 				end
 			end
 		end
@@ -672,13 +733,19 @@ function ProfileReborn:mouse_moved(o, x, y)
 	
 	-- filter bg color
 	if self._filter:inside(x, y) then
-		self._filter_bg:set_color(Color(40, 30, 105, 100) / 255)
+		self._filter_bg:set_color(self._filter_bg_color)
+		self._filter_bg:set_alpha(0.15)
 	else
 		self._filter_bg:set_color(Color.black)
+		self._filter_bg:set_alpha(1)
 	end
 end
 
 function ProfileReborn:mouse_pressed(o, button, x, y)
+	if self._editing then
+		return
+	end
+	
 	if self._selected then
 		return
 	end
@@ -697,7 +764,11 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		elseif self.perk_deck.display_mode == 2 then
 			if self.perk_deck.deck_list.text and self.perk_deck.deck_list.text:inside(x, y) then
 				self:wheel_scroll_perk(-self._wheel_scroll_value_custom)
-			end			
+			end
+		elseif self.perk_deck.display_mode == 3 then
+			if self.perk_deck.deck_list.text_sort and self.perk_deck.deck_list.text_sort:inside(x, y) then
+				self:wheel_scroll_perk(-self._wheel_scroll_value_custom)
+			end
 		end
 		
 		if self._current_filter == 3 and self.custom.filter_list:inside(x, y) then
@@ -715,7 +786,11 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		elseif self.perk_deck.display_mode == 2 then
 			if self.perk_deck.deck_list.text and self.perk_deck.deck_list.text:inside(x, y) then
 				self:wheel_scroll_perk(self._wheel_scroll_value_custom)
-			end			
+			end
+		elseif self.perk_deck.display_mode == 3 then
+			if self.perk_deck.deck_list.text_sort and self.perk_deck.deck_list.text_sort:inside(x, y) then
+				self:wheel_scroll_perk(self._wheel_scroll_value_custom)
+			end
 		end
 		if self._current_filter == 3 and self.custom.filter_list:inside(x, y) then
 			self:wheel_scroll_custom(self._wheel_scroll_value_custom)
@@ -765,9 +840,9 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		if self._current_filter == 2 then
 			if self.perk_deck.display_mode == 1 then
 				if self.perk_deck.deck_list.icon and self.perk_deck.deck_list.icon:inside(x, y) then
-					for _, data in ipairs(self.perk_deck.LeftList) do
-						if data.bitmap:inside(x, y) then
-							self:switch_perk(data.id)
+					for _, panel in ipairs(self.perk_deck.deck_list.icon:children()) do
+						if panel:inside(x, y) then
+							self:switch_perk(panel:layer())
 							break
 						end
 					end
@@ -775,6 +850,16 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			elseif self.perk_deck.display_mode == 2 then
 				if self.perk_deck.deck_list.text and self.perk_deck.deck_list.text:inside(x, y) then
 					for key, panel in pairs(self.perk_deck.deck_list.text:children()) do
+						if panel:inside(x, y) then
+							if panel:layer() ~= self.perk_deck.current_perk then
+								self:switch_perk(panel:layer())
+							end
+						end
+					end
+				end
+			elseif self.perk_deck.display_mode == 3 then
+				if self.perk_deck.deck_list.text_sort and self.perk_deck.deck_list.text_sort:inside(x, y) then
+					for key, panel in pairs(self.perk_deck.deck_list.text_sort:children()) do
 						if panel:inside(x, y) then
 							if panel:layer() ~= self.perk_deck.current_perk then
 								self:switch_perk(panel:layer())
@@ -964,12 +1049,16 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			--##SetCustom
 			for num, filter in ipairs(self.custom.filters) do
 				if filter.panel:inside(x, y) then
-					self:switch_filter(3, num)
+					self.custom.filters[self.custom.current_custom_filter].panel:child("custom_filter_rect"):set_alpha(0)
+					self.custom.filters[num].panel:child("custom_filter_rect"):set_alpha(0.75)
+					self:switch_custom(num)
 					break
 				end
 			end
 		end
 	end
+
+	self:update_scrollbar()  --更新滚动条
 end
 
 function ProfileReborn:mouse_released(o, button, x, y)
@@ -1042,9 +1131,17 @@ function ProfileReborn:set_perk_desk_profile()
 		h = self._panel:h()
 	})
 	
+	--创建文字排序的主panel
+	self.perk_deck.deck_list.text_sort = self._ws:panel():panel({
+		layer = self._ui_layer + 1,
+		w = 200,
+		h = self._panel:h()
+	})
+	
 	self.perk_deck.panels = {
 		self.perk_deck.deck_list.icon,
-		self.perk_deck.deck_list.text
+		self.perk_deck.deck_list.text,
+		self.perk_deck.deck_list.text_sort
 	}
 	
 	local deck_list_icon = self.perk_deck.deck_list.icon
@@ -1054,6 +1151,10 @@ function ProfileReborn:set_perk_desk_profile()
 	local deck_list_text = self.perk_deck.deck_list.text
 	deck_list_text:set_right(self._panel:left()-1)
 	deck_list_text:set_top(self._panel:top())
+	
+	local deck_list_text_sort = self.perk_deck.deck_list.text_sort
+	deck_list_text_sort:set_right(self._panel:left()-1)
+	deck_list_text_sort:set_top(self._panel:top())
 	
 	-- deck_list_icon:rect({
 		-- name = "deck_list_rect",
@@ -1065,8 +1166,6 @@ function ProfileReborn:set_perk_desk_profile()
 	-- })
 	
 	local last_perk
-	self.perk_deck.LeftList = {}
-	self.perk_deck.LeftListText = {}
 	self.perk_deck.display_mode = self.save_data.perk_deck_display_mode or 1
 	
 	for perk = 1, 30 do if self.perk_deck.perks[perk] then
@@ -1087,18 +1186,13 @@ function ProfileReborn:set_perk_desk_profile()
 				name = "perk_icon_" .. tostring(perk),
 				texture = icon_atlas_texture,
 				texture_rect = texture_rect,
-				layer = 1,
+				layer = perk,   --借用层级，存取perk编号
 				y = last_panel and last_panel:bottom() or 0,
 				w = deck_list_icon:w(),
 				h = deck_list_icon:w()
 			})
 				
 			perk_icon:set_center_x(deck_list_icon:w() / 2 - 2)
-				
-			self.perk_deck.LeftList[#self.perk_deck.LeftList+1] = {
-				bitmap = perk_icon,
-				id = perk
-			}
 			
 			-- display_mode 2
 			local perk_text = self:get_specialization_text(perk)
@@ -1115,7 +1209,7 @@ function ProfileReborn:set_perk_desk_profile()
 			
 			local text_perk_rect = text_perk_panel:rect({
 				name = "text_perk_rect",
-				color = Color(173 / 255,216 / 255,230 / 255),
+				color = self._leftlist_text_bg_color,
 				layer = 1,
 				alpha = 0,
 				w = text_perk_panel:w(),
@@ -1125,6 +1219,7 @@ function ProfileReborn:set_perk_desk_profile()
 			text_perk_rect:set_center_x(text_perk_panel:w() / 2)
 				
 			local text_perk_text = text_perk_panel:text({
+				name = "text_perk_text",
 				vertical = "center",
 				valign = "center",
 				align = "right",
@@ -1132,22 +1227,73 @@ function ProfileReborn:set_perk_desk_profile()
 				layer = 2,
 				font = tweak_data.hud_players.ammo_font,
 				text = string.upper(perk_text),
-				font_size = 20
+				font_size = 20,
+				color = self._leftlist_font_color
 			})	
 				
 			local center_x = text_perk_panel:w() / 2
 			local center_y = text_perk_panel:h() / 2
 			text_perk_text:set_center_y(center_y)
 			text_perk_text:set_right(text_perk_panel:right())
-			
-			self.perk_deck.LeftListText[#self.perk_deck.LeftListText+1] = {
-				bitmap = text_perk_panel,
-				id = perk
-			}
-			
+
 			last_perk = perk
 		end
 	end end
+	
+	-- display_mode 3 将天赋文字显示方式为字母排序
+	local sorted_perks = {}
+
+	for _, perk_data in pairs(deck_list_text:children()) do
+		table.insert(sorted_perks, perk_data)
+	end
+
+	table.sort(sorted_perks, function (a, b)
+		return a:child("text_perk_text"):text() < b:child("text_perk_text"):text()
+	end)
+
+	for key, perk in ipairs(sorted_perks) do
+		local perk_text = self:get_specialization_text(perk:layer())
+		local last_panel = deck_list_text_sort:child("perk_text_sort_" .. tostring(last_perk))
+			
+		local text_perk_sort_panel = self.perk_deck.deck_list.text_sort:panel({
+			name = "perk_text_sort_" .. tostring(perk:layer()),
+			y = last_panel and last_panel:bottom() or 0,
+			w = deck_list_text_sort:w(),
+			h = self._filter_list_h,
+			layer = perk:layer()
+		})
+		
+		local text_sort_perk_rect = text_perk_sort_panel:rect({
+			name = "text_sort_perk_rect",
+			color = self._leftlist_text_bg_color,
+			layer = 1,
+			alpha = 0,
+			w = text_perk_sort_panel:w(),
+			h = self._filter_list_h
+		})
+			
+		text_sort_perk_rect:set_center_x(text_perk_sort_panel:w() / 2)
+			
+		local text_sort_perk_text = text_perk_sort_panel:text({
+			vertical = "center",
+			valign = "center",
+			align = "right",
+			halign = "right",
+			layer = 2,
+			font = tweak_data.hud_players.ammo_font,
+			text = string.upper(perk_text),
+			font_size = 20,
+			color = self._leftlist_font_color
+		})	
+			
+		local center_x = text_perk_sort_panel:w() / 2
+		local center_y = text_perk_sort_panel:h() / 2
+		text_sort_perk_text:set_center_y(center_y)
+		text_sort_perk_text:set_right(text_perk_sort_panel:right())
+
+		last_perk = perk:layer()
+	end
+	--------------------------------------
 	
 	self.perk_display_mode_panel = self._ws:panel():panel({
 		layer = self._ui_layer,
@@ -1193,7 +1339,8 @@ function ProfileReborn:set_perk_desk_profile()
 		halign = "center",
 		font = tweak_data.hud_players.ammo_font,
 		text = string.upper(managers.localization:text(display_mode_text)),
-		font_size = 18
+		font_size = 18,
+		color = self._perk_deck_display_method_text_color
 	})
 		
 	arrow_left:set_center_y(self.perk_display_mode_panel:h() / 2)
@@ -1290,7 +1437,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 		halign = "center",
 		font = tweak_data.hud_players.ammo_font,
 		text = string.upper(managers.localization:text("menu_bp_center_text")),
-		font_size = 25
+		font_size = 25,
+		color = self._new_add_filter_text_color
 	})
 	
 	local center_x = self._panel:w() / 2
@@ -1545,7 +1693,7 @@ function ProfileReborn:create_filter_ui(name, key)
 	
 	local custom_filter = filter:rect({
 		name = "custom_filter_rect",
-		color = Color(173 / 255,216 / 255,230 / 255),
+		color = self._leftlist_text_bg_color,
 		layer = 1,
 		alpha = 0,
 		w = self.custom.filter_list:w(),
@@ -1562,7 +1710,8 @@ function ProfileReborn:create_filter_ui(name, key)
 		layer = 2,
 		font = tweak_data.hud_players.ammo_font,
 		text = name or "CustomFilter#" .. tostring(key),
-		font_size = 20
+		font_size = 20,
+		color = self._leftlist_font_color
 	})	
 	
 	local center_x = filter:w() / 2
@@ -1649,6 +1798,8 @@ function ProfileReborn:switch_filter(value, base_filter)
 		local child = self._filter:child("bp_filter_" .. method)
 		child:set_visible(child:layer() == self._current_filter)
 	end
+
+	self:update_scrollbar()  --在配置的时候更新一次滚动条（使其最开始的时候可以显示出来）
 end
 
 function ProfileReborn:switch_perk(perk)
@@ -1660,8 +1811,8 @@ function ProfileReborn:switch_perk(perk)
 			self:set_profile(self._ui.profile, i, profile[i].profile, profile[i].idx)
 		end
 		
-		for _, data in ipairs(self.perk_deck.LeftList) do
-			data.bitmap:set_color(Color.white)
+		for _, panel in ipairs(self.perk_deck.deck_list.icon:children()) do
+			panel:set_color(Color.white)
 		end
 		
 		if self.perk_deck.deck_list.icon then
@@ -1684,7 +1835,33 @@ function ProfileReborn:switch_perk(perk)
 			end
 		end
 		
+		if self.perk_deck.deck_list.text_sort then
+			local perk_text = self.perk_deck.deck_list.text_sort:child("perk_text_sort_" .. perk)
+			
+			if perk_text then
+				perk_text:child("text_sort_perk_rect"):set_alpha(0.75)
+			end
+			
+			if self.perk_deck.current_perk then
+				self.perk_deck.deck_list.text_sort:child("perk_text_sort_" .. self.perk_deck.current_perk):child("text_sort_perk_rect"):set_alpha(0)
+			end
+		end
+		
 		self.perk_deck.current_perk = perk
+		managers.mouse_pointer:set_pointer_image("arrow")
+	end
+end
+
+function ProfileReborn:switch_custom(key)
+	local profile = self.custom.filters[key].profiles
+	if profile then
+		self:reset_profile_panels()
+	
+		for i = 1, #profile do
+			self:set_profile(self._ui.profile, i, profile[i].profile, profile[i].idx)
+		end
+		
+		self.custom.current_custom_filter = key
 		managers.mouse_pointer:set_pointer_image("arrow")
 	end
 end
@@ -1693,6 +1870,36 @@ function ProfileReborn:rename_filter(index, new_name)
 	self.custom.filters[index].name = new_name
 	self:save()					
 	self:switch_filter(3)
+end
+
+-- 更新右边滚动条的位置和大小
+function ProfileReborn:update_scrollbar()
+	local children = self._ui_panel:children()  -- 获取所有子profile
+	local total_height = 0
+	local visible_height = self._panel:h()
+    
+	-- 计算所有Profile的总高度
+	total_height = self._bg_h * #children
+    
+	-- 判断是否需要显示滚动条
+	if total_height <= visible_height then
+		self._scroll_bar:set_visible(false)
+		return
+	end
+    
+	self._scroll_bar:set_visible(true)
+    
+	-- 计算滚动条高度
+	local scroll_bar_height = visible_height * (visible_height / total_height)
+	
+	-- 计算滚动条位置
+	local scroll_progress = -self._ui.profile[1]:y() / (total_height - visible_height)
+	local scroll_bar_y = scroll_progress * (visible_height - scroll_bar_height)
+	
+	-- 设置滚动条位置和大小
+	self._scroll_bar:set_h(scroll_bar_height)
+	self._scroll_bar:set_right(self._panel:w())
+	self._scroll_bar:set_top(scroll_bar_y)
 end
 
 function ProfileReborn:wheel_scroll_bd(dy)
@@ -1715,18 +1922,14 @@ end
 
 function ProfileReborn:wheel_scroll_perk(dy)
 	if self.perk_deck.display_mode == 1 then
-		if self.perk_deck.deck_list.icon:w() * #self.perk_deck.LeftList >= self.perk_deck.deck_list.icon:h() then
+		local icon_perk_panels = self.perk_deck.deck_list.icon:children()
+		
+		if self.perk_deck.deck_list.icon:w() * #icon_perk_panels >= self.perk_deck.deck_list.icon:h() then
 			local minimum_perk
 			local last_perk
-			for _, child in ipairs(self.perk_deck.LeftList) do
-				minimum_perk = self.perk_deck.LeftList[1].bitmap
-				break
-			end
-			
-			for _, child in ipairs(self.perk_deck.LeftList) do
-				last_perk = self.perk_deck.LeftList[#self.perk_deck.LeftList].bitmap
-				break
-			end
+
+			minimum_perk = icon_perk_panels[1]
+			last_perk = icon_perk_panels[#icon_perk_panels]
 			
 			if dy > 0 then
 				if minimum_perk:y() + dy >= 0 then
@@ -1738,17 +1941,19 @@ function ProfileReborn:wheel_scroll_perk(dy)
 				end			
 			end
 			
-			for _, data in ipairs(self.perk_deck.LeftList) do
-				data.bitmap:set_y(data.bitmap:y() + dy)
+			for _, panel in ipairs(icon_perk_panels) do
+				panel:set_y(panel:y() + dy)
 			end
 		end
 	elseif self.perk_deck.display_mode == 2 then
-		if self._filter_list_h * #self.perk_deck.LeftListText >= self.perk_deck.deck_list.text:h() then
+		local text_perk_panels = self.perk_deck.deck_list.text:children()
+		
+		if self._filter_list_h * #text_perk_panels >= self.perk_deck.deck_list.text:h() then
 			local minimum
 			local last
 			
-			minimum = self.perk_deck.LeftListText[1].bitmap
-			last = self.perk_deck.LeftListText[#self.perk_deck.LeftListText].bitmap
+			minimum = text_perk_panels[1]
+			last = text_perk_panels[#text_perk_panels]
 			
 			if dy > 0 then
 				if minimum:y() + dy >= 0 then
@@ -1760,10 +1965,35 @@ function ProfileReborn:wheel_scroll_perk(dy)
 				end
 			end
 			
-			for _, data in ipairs(self.perk_deck.LeftListText) do
-				data.bitmap:set_y(data.bitmap:y() + dy)
+			for _, panel in ipairs(text_perk_panels) do
+				panel:set_y(panel:y() + dy)
 			end
-		end	
+		end
+	elseif self.perk_deck.display_mode == 3 then
+		--天赋模式左列表display_mode 3时的滚轮上下滑
+		local text_sort_perk_panels = self.perk_deck.deck_list.text_sort:children()  --获取text_sort的所有子级
+		
+		if self._filter_list_h * #text_sort_perk_panels >= self.perk_deck.deck_list.text:h() then
+			local minimum
+			local last
+			
+			minimum = text_sort_perk_panels[1]
+			last = text_sort_perk_panels[#text_sort_perk_panels]
+			
+			if dy > 0 then
+				if minimum:y() + dy >= 0 then
+					dy = -minimum:y()
+				end
+			else
+				if last:bottom() + dy <= self._panel:h() then
+					dy = self.perk_deck.deck_list.text:h() - last:bottom()
+				end
+			end
+			
+			for _, panel in ipairs(text_sort_perk_panels) do
+				panel:set_y(panel:y() + dy)
+			end
+		end
 	end
 end
 
@@ -1840,9 +2070,6 @@ function ProfileReborn:set_editing(editing)
 	self._input_panel:set_visible(editing)
 	
 	if editing then
-		managers.menu:active_menu().input:set_force_input(false)
-		managers.menu:active_menu().input:deactivate_mouse()
-		managers.mouse_pointer:remove_mouse(self._mouse_data)
 		self._input_panel:enter_text(callback(self, self, "enter_text"))
 
 		local n = utf8.len(self._name_text:text())
@@ -1853,8 +2080,6 @@ function ProfileReborn:set_editing(editing)
 			Input:keyboard():show_with_text(self._name_text:text(), self._max_length)
 		end
 	else
-		managers.menu:active_menu().input:activate_mouse()
-		managers.mouse_pointer:use_mouse(self._mouse_data)
 		self._input_panel:enter_text(nil)
 		self._name_text:set_text("")
 		
@@ -2101,4 +2326,19 @@ function ProfileReborn:get_specialization_text(perk)
 	local specialization_text = specialization_data and managers.localization:text(specialization_data.name_id) or " "
 	
 	return string.gsub(specialization_text, "^[%s]*(.-)[%s]*$", "%1")
+end
+
+--将Color函数的颜色饱和度增高
+---@param color:userdata
+function ProfileReborn:Saturation(color)
+	local r = color.r
+	local g = color.g
+	local b = color.b
+	local max = math.max(r, g, b)
+	
+	r = max ~= r and r / 3 or r * 2
+	g = max ~= g and g / 3 or g * 2
+	b = max ~= b and b / 3 or b * 2
+
+	return Color(r, g, b)
 end
