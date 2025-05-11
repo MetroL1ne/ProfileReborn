@@ -11,7 +11,6 @@
 - Fixed the issue in custom filter of resetting the position of the left list when switching
 - Some optimizations, Removed some useless variable
 
-
 **1.013**
 - Changed the font size of the Profile name 12 >> 14
 - Changed the font size of the Profile Skill Tree display 12 >> 13
