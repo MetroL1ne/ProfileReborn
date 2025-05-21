@@ -1,4 +1,8 @@
 # Change log
+**1.021**
+- Changed the position of the Perk Deck Filter display method option
+- Fixed mask related crashes
+
 **1.02**
 - Added new Perk Deck filter display method to sort text by character
 - Added a preview only scrollbar
