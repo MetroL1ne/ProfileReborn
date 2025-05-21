@@ -3,7 +3,6 @@
 - The option to change the display mode of the Perk Deck filter is located to the right of the filter selector
 - Fixed crash related to mask
 
-
 **1.02**
 - Added new Perk Deck filter display method to sort text by character
 - Added a preview only scrollbar
