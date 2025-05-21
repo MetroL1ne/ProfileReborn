@@ -454,7 +454,13 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	end
 		
 	local slot = profile.mask
-	local mask_texture = managers.blackmarket:get_mask_icon(Global.blackmarket_manager.crafted_items["masks"][slot].mask_id)
+	local bm_mask = Global.blackmarket_manager.crafted_items["masks"][slot]
+
+	if not bm_mask then
+		return
+	end
+
+	local mask_texture = managers.blackmarket:get_mask_icon(bm_mask.mask_id)
 	local mask = panel:bitmap({
 		texture = mask_texture,
 		w = 70,
@@ -1301,7 +1307,7 @@ function ProfileReborn:set_perk_desk_profile()
 		h = 30
 	})
 	
-	self.perk_display_mode_panel:set_right(self._filter:left())
+	self.perk_display_mode_panel:set_left(self._filter:right())
 	self.perk_display_mode_panel:set_top(self._panel:bottom() + 2)
 	
 	local menu_arrows_texture = "guis/textures/menu_arrows"
