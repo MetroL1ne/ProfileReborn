@@ -10,7 +10,7 @@ DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn
 
 function ProfileReborn:init()
 	self._ui_layer = 500  --整体UI的层级
-	self._wheel_scroll_value = 60  --浏览下拉Profile列表的速度
+	self._wheel_scroll_value = 3  --浏览下拉Profile列表的速度
 	self._wheel_scroll_value_custom = 15  --左列表文字系列的下拉速度
 	self._filter_list_h = 30  --左文字列表的高度
 	self._bg_h = 100  --Profile显示的高度
@@ -50,14 +50,30 @@ end
 
 function ProfileReborn:active()
 	self._ws = managers.gui_data:create_fullscreen_workspace()
-	self._panel = self._ws:panel():panel({
-		layer = self._ui_layer,	
-		w = 800,
-		h = 500
-	})
-	self._panel:set_center(self._ws:panel():center_x(), self._ws:panel():center_y())
+
+	self._controller_cls = {}
 	
-	self._ui_panel = self._panel:panel()
+	self._controller_cls.profile_list = PRebornScrollList:new(self._ws:panel(), {
+		scrollbar_padding = 0,
+		bar_minimum_size = 16,
+		padding = 0,
+		w = 800,
+		h = 500,
+		input_focus = true,
+		layer = self._ui_layer,
+		dy = self._wheel_scroll_value
+	}, {
+		padding = 0
+	})
+
+	self._controller_cls.profile_list:add_lines_and_static_down_indicator()
+
+	self._panel = self._controller_cls.profile_list:panel()
+	self._canvas = self._controller_cls.profile_list:canvas()
+
+	self._panel:set_center(self._ws:panel():center_x(), self._ws:panel():center_y())
+
+	self._ui_panel = self._canvas
 	
 	self:load()
 
@@ -136,12 +152,12 @@ function ProfileReborn:active()
 		color = Color.black,
 		alpha = 0.9,
 		layer = -50,
-		w = self._panel:w(),
-		h = self._panel:h()
+		w = self._canvas:w(),
+		h = self._canvas:h()
 	})
 	
 	--创建滚动条
-	self._scroll_bar = self._panel:rect({
+	self._scroll_bar = self._canvas:rect({
 	    name = "scroll_bar",
 	    color = Color.white,
 	    visible = false,
@@ -150,7 +166,7 @@ function ProfileReborn:active()
 	})
 	self._scroll_bar:set_w(2)
 
-	self:create_side(self._panel)
+	-- self:create_side(self._canvas)
 	self:create_side(self._filter)
 	
 	self._ui = {}
@@ -189,10 +205,12 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	ui_panel[idx] = self._ui_panel:panel({
 		layer = profile_idx or 0, --借用层级，存取profile编号
 		w = self._rect:w(),
-		h = self._bg_h,
-		y = self._rect:top() + self._bg_h * idx - self._bg_h + (ui_panel[1] and ui_panel[1]:y() or 0)
+		h = self._bg_h
+		-- y = self._rect:top() + self._bg_h * idx - self._bg_h + (ui_panel[1] and ui_panel[1]:y() or 0)
 	})
-	
+
+	self._controller_cls.profile_list:add_item(ui_panel[idx])
+
 	local panel = ui_panel[idx]
 	local profile_bg = panel:bitmap({
 		visible = false,
@@ -549,21 +567,14 @@ function ProfileReborn:reset_panel()
 	
 	--remove PerkDeck filter
 	if self._current_filter ~= 2 then
-		if self.perk_deck.deck_list.icon then
-			self._ws:panel():remove(self.perk_deck.deck_list.icon)
-			self.perk_deck.deck_list.icon = nil
+		if self._ws:panel():child("left_list") then
+			self._ws:panel():remove(self._ws:panel():child("left_list"))
+
+			self._controller_cls.perk_icon = nil
+			self._controller_cls.perk_text = nil
+			self._controller_cls.perk_text_sort = nil
 		end
-		
-		if self.perk_deck.deck_list.text then
-			self._ws:panel():remove(self.perk_deck.deck_list.text)
-			self.perk_deck.deck_list.text = nil
-		end
-		
-		if self.perk_deck.deck_list.text_sort then
-			self._ws:panel():remove(self.perk_deck.deck_list.text_sort)
-			self.perk_deck.deck_list.text_sort = nil
-		end
-		
+
 		self.perk_deck.current_perk = nil
 		
 		if self.perk_display_mode_panel then
@@ -585,8 +596,9 @@ end
 
 --重置所有和profile列表有关的内容
 function ProfileReborn:reset_profile_panels()
-	self._panel:remove(self._ui_panel)
-	self._ui_panel = self._panel:panel()
+	self._controller_cls.profile_list:clear()
+	-- self._canvas:remove(self._ui_panel)
+	-- self._ui_panel = self._canvas:panel()
 	self._ui.profile = {}
 	self.profile = {}
 end
@@ -599,13 +611,17 @@ function ProfileReborn:mouse_moved(o, x, y)
 	if not self._panel then
 		return
 	end
-	
+
 	self._mouse_x = x
 	self._mouse_y = y
 	self._mouse_inside = false
 	self._touch_profile = nil	
 	self._touch_ui = nil
-	
+
+	for _, cls in pairs(self._controller_cls) do
+		self._mouse_inside = cls:mouse_moved(o, x, y) and true or self._mouse_inside
+	end
+
 	-- if self._panel:inside(self._mouse_x, self._mouse_y) then
 	for idx, box in pairs(self._ui.profile) do
 		local profile = self._ui.profile[idx]
@@ -642,38 +658,7 @@ function ProfileReborn:mouse_moved(o, x, y)
 	
 	-- deck list
 	if self._current_filter == 2 then
-		if self.perk_deck.display_mode == 1 then
-			if self.perk_deck.deck_list.icon and self.perk_deck.deck_list.icon:inside(x, y) then
-				for _, panel in ipairs(self.perk_deck.deck_list.icon:children()) do
-					if panel:inside(x, y) and panel:layer() ~= self.perk_deck.current_perk then
-						self._mouse_inside = true
-						break
-					end
-				end
-			end
-		elseif self.perk_deck.display_mode == 2 then
-			for _, child in pairs(self.perk_deck.deck_list.text:children()) do
-				if child:layer() == self.perk_deck.current_perk then
-					child:child("text_perk_rect"):set_alpha(0.75)
-				elseif child:inside(x, y) then
-					child:child("text_perk_rect"):set_alpha(0.5)
-					self._mouse_inside = true
-				else
-					child:child("text_perk_rect"):set_alpha(0)
-				end
-			end
-		elseif self.perk_deck.display_mode == 3 then
-			for _, child in pairs(self.perk_deck.deck_list.text_sort:children()) do
-				if child:layer() == self.perk_deck.current_perk then
-					child:child("text_sort_perk_rect"):set_alpha(0.75)
-				elseif child:inside(x, y) then
-					child:child("text_sort_perk_rect"):set_alpha(0.5)
-					self._mouse_inside = true
-				else
-					child:child("text_sort_perk_rect"):set_alpha(0)
-				end
-			end
-		end
+
 		
 		if self.perk_display_mode_panel:child("arrow_left"):inside(x, y) or self.perk_display_mode_panel:child("arrow_right"):inside(x, y) then
 			self._mouse_inside = true
@@ -755,54 +740,13 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 	if self._selected then
 		return
 	end
-	
+
+	for _, cls in pairs(self._controller_cls) do
+		cls:mouse_pressed(button, x, y)
+	end
+
 	local ccf = self.custom.current_custom_filter
 
-	if button == Idstring("mouse wheel down") then
-		if self._rect:inside(x, y) then
-			self:wheel_scroll_bd(-self._wheel_scroll_value)
-		end
-		
-		if self.perk_deck.display_mode == 1 then
-			if self.perk_deck.deck_list.icon and self.perk_deck.deck_list.icon:inside(x, y) then
-				self:wheel_scroll_perk(-self.perk_deck.deck_list.icon:w())
-			end
-		elseif self.perk_deck.display_mode == 2 then
-			if self.perk_deck.deck_list.text and self.perk_deck.deck_list.text:inside(x, y) then
-				self:wheel_scroll_perk(-self._wheel_scroll_value_custom)
-			end
-		elseif self.perk_deck.display_mode == 3 then
-			if self.perk_deck.deck_list.text_sort and self.perk_deck.deck_list.text_sort:inside(x, y) then
-				self:wheel_scroll_perk(-self._wheel_scroll_value_custom)
-			end
-		end
-		
-		if self._current_filter == 3 and self.custom.filter_list:inside(x, y) then
-			self:wheel_scroll_custom(-self._wheel_scroll_value_custom)
-		end
-	elseif button == Idstring("mouse wheel up") then
-		if self._rect:inside(x, y) then
-			self:wheel_scroll_bd(self._wheel_scroll_value)
-		end
-		
-		if self.perk_deck.display_mode == 1 then
-			if self.perk_deck.deck_list.icon and self.perk_deck.deck_list.icon:inside(x, y) then
-				self:wheel_scroll_perk(self.perk_deck.deck_list.icon:w())
-			end
-		elseif self.perk_deck.display_mode == 2 then
-			if self.perk_deck.deck_list.text and self.perk_deck.deck_list.text:inside(x, y) then
-				self:wheel_scroll_perk(self._wheel_scroll_value_custom)
-			end
-		elseif self.perk_deck.display_mode == 3 then
-			if self.perk_deck.deck_list.text_sort and self.perk_deck.deck_list.text_sort:inside(x, y) then
-				self:wheel_scroll_perk(self._wheel_scroll_value_custom)
-			end
-		end
-		if self._current_filter == 3 and self.custom.filter_list:inside(x, y) then
-			self:wheel_scroll_custom(self._wheel_scroll_value_custom)
-		end
-	end
-	
 	if button == Idstring("0") then
 		if self._touch_profile then
 			local profile = self._ui.profile[self._touch_ui]
@@ -844,37 +788,6 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		end
 		
 		if self._current_filter == 2 then
-			if self.perk_deck.display_mode == 1 then
-				if self.perk_deck.deck_list.icon and self.perk_deck.deck_list.icon:inside(x, y) then
-					for _, panel in ipairs(self.perk_deck.deck_list.icon:children()) do
-						if panel:inside(x, y) then
-							self:switch_perk(panel:layer())
-							break
-						end
-					end
-				end
-			elseif self.perk_deck.display_mode == 2 then
-				if self.perk_deck.deck_list.text and self.perk_deck.deck_list.text:inside(x, y) then
-					for key, panel in pairs(self.perk_deck.deck_list.text:children()) do
-						if panel:inside(x, y) then
-							if panel:layer() ~= self.perk_deck.current_perk then
-								self:switch_perk(panel:layer())
-							end
-						end
-					end
-				end
-			elseif self.perk_deck.display_mode == 3 then
-				if self.perk_deck.deck_list.text_sort and self.perk_deck.deck_list.text_sort:inside(x, y) then
-					for key, panel in pairs(self.perk_deck.deck_list.text_sort:children()) do
-						if panel:inside(x, y) then
-							if panel:layer() ~= self.perk_deck.current_perk then
-								self:switch_perk(panel:layer())
-							end
-						end
-					end
-				end
-			end
-			
 			if self.perk_display_mode_panel:child("arrow_left"):inside(x, y) then		
 				self:set_perks_display_mode(self.perk_deck.display_mode - 1)
 			elseif self.perk_display_mode_panel:child("arrow_right"):inside(x, y) then
@@ -1063,11 +976,12 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			end
 		end
 	end
-
-	self:update_scrollbar()  --更新滚动条
 end
 
 function ProfileReborn:mouse_released(o, button, x, y)
+	for _, cls in pairs(self._controller_cls) do
+		cls:mouse_released(button, x, y)
+	end
 end
 
 function ProfileReborn:mouse_clicked(o, button, x, y)
@@ -1124,54 +1038,67 @@ function ProfileReborn:set_perk_desk_profile()
 		}
 	end
 	
-	
-	self.perk_deck.deck_list.icon = self._ws:panel():panel({
+	local leftlist_panel = self._ws:panel():panel({
+		name = "left_list"
+	})
+
+	self._controller_cls.perk_icon = PRebornScrollListSimple:new(leftlist_panel, {
 		layer = self._ui_layer + 1,
 		w = 50,
-		h = self._panel:h()
+		h = self._panel:h(),
+		dy = 50,
+		selection = true,
+		selection_mode = 2
 	})
-	
-	self.perk_deck.deck_list.text = self._ws:panel():panel({
+
+	self._controller_cls.perk_text = PRebornScrollListSimple:new(leftlist_panel, {
 		layer = self._ui_layer + 1,
 		w = 200,
-		h = self._panel:h()
+		h = self._panel:h(),
+		dy = 10,
+		selection = true,
+		selection_mode = 1,
+		rect_color = self._leftlist_text_bg_color
 	})
-	
+
 	--创建文字排序的主panel
-	self.perk_deck.deck_list.text_sort = self._ws:panel():panel({
+	self._controller_cls.perk_text_sort = PRebornScrollListSimple:new(leftlist_panel, {
 		layer = self._ui_layer + 1,
 		w = 200,
-		h = self._panel:h()
+		h = self._panel:h(),
+		dy = 10,
+		selection = true,
+		selection_mode = 1,
+		rect_color = self._leftlist_text_bg_color
 	})
-	
+
 	self.perk_deck.panels = {
-		self.perk_deck.deck_list.icon,
-		self.perk_deck.deck_list.text,
-		self.perk_deck.deck_list.text_sort
+		self._controller_cls.perk_icon,
+		self._controller_cls.perk_text,
+		self._controller_cls.perk_text_sort
 	}
 	
-	local deck_list_icon = self.perk_deck.deck_list.icon
-	deck_list_icon:set_right(self._panel:left())
-	deck_list_icon:set_top(self._panel:top())
+	local deck_list_icon = self.perk_deck.panels[1]
+	deck_list_icon:panel():set_right(self._panel:left())
+	deck_list_icon:panel():set_top(self._panel:top())
+	deck_list_icon:set_callback(function(idx)
+		self:switch_perk(idx)
+	end)
+
+	local deck_list_text = self.perk_deck.panels[2]
+	deck_list_text:panel():set_right(self._panel:left()-1)
+	deck_list_text:panel():set_top(self._panel:top())
+	deck_list_text:set_callback(function(idx)
+		self:switch_perk(idx)
+	end)
+
+	local deck_list_text_sort = self.perk_deck.panels[3]
+	deck_list_text_sort:panel():set_right(self._panel:left()-1)
+	deck_list_text_sort:panel():set_top(self._panel:top())
+	deck_list_text_sort:set_callback(function(idx)
+		self:switch_perk(idx)
+	end)
 	
-	local deck_list_text = self.perk_deck.deck_list.text
-	deck_list_text:set_right(self._panel:left()-1)
-	deck_list_text:set_top(self._panel:top())
-	
-	local deck_list_text_sort = self.perk_deck.deck_list.text_sort
-	deck_list_text_sort:set_right(self._panel:left()-1)
-	deck_list_text_sort:set_top(self._panel:top())
-	
-	-- deck_list_icon:rect({
-		-- name = "deck_list_rect",
-		-- color = Color.black,
-		-- layer = -50,
-		-- alpha = 0.6,
-		-- w = deck_list_icon:w(),
-		-- h = deck_list_icon:h()
-	-- })
-	
-	local last_perk
 	self.perk_deck.display_mode = self.save_data.perk_deck_display_mode or 1
 	
 	for perk = 1, 30 do if self.perk_deck.perks[perk] then
@@ -1186,44 +1113,30 @@ function ProfileReborn:set_perk_desk_profile()
 				icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[9])
 			end
 			
-			local last_panel = deck_list_icon:child("perk_icon_" .. tostring(last_perk))
 				
-			local perk_icon = deck_list_icon:bitmap({
+			local perk_icon = deck_list_icon:canvas():bitmap({
 				name = "perk_icon_" .. tostring(perk),
 				texture = icon_atlas_texture,
 				texture_rect = texture_rect,
 				layer = perk,   --借用层级，存取perk编号
-				y = last_panel and last_panel:bottom() or 0,
-				w = deck_list_icon:w(),
-				h = deck_list_icon:w()
+				w = deck_list_icon:canvas():w(),
+				h = deck_list_icon:canvas():w()
 			})
 				
-			perk_icon:set_center_x(deck_list_icon:w() / 2 - 2)
-			
+			perk_icon:set_center_x(deck_list_icon:canvas():w() / 2 - 2)
+
+			deck_list_icon:add_item(perk_icon, true, perk)
+
 			-- display_mode 2
 			local perk_text = self:get_specialization_text(perk)
-			local last_panel = deck_list_text:child("perk_text_" .. tostring(last_perk))
-				
-			local text_perk_panel = self.perk_deck.deck_list.text:panel({
+			
+			local text_perk_panel = deck_list_text:canvas():panel({
 				name = "perk_text_" .. tostring(perk),
-				y = last_panel and last_panel:bottom() or 0,
-				w = deck_list_text:w(),
+				w = deck_list_text:canvas():w(),
 				h = self._filter_list_h,
 				layer = perk
 			})
 
-			
-			local text_perk_rect = text_perk_panel:rect({
-				name = "text_perk_rect",
-				color = self._leftlist_text_bg_color,
-				layer = 1,
-				alpha = 0,
-				w = text_perk_panel:w(),
-				h = self._filter_list_h
-			})
-				
-			text_perk_rect:set_center_x(text_perk_panel:w() / 2)
-				
 			local text_perk_text = text_perk_panel:text({
 				name = "text_perk_text",
 				vertical = "center",
@@ -1242,14 +1155,14 @@ function ProfileReborn:set_perk_desk_profile()
 			text_perk_text:set_center_y(center_y)
 			text_perk_text:set_right(text_perk_panel:right())
 
-			last_perk = perk
+			deck_list_text:add_item(text_perk_panel, true, perk)
 		end
 	end end
 	
 	-- display_mode 3 将天赋文字显示方式为字母排序
 	local sorted_perks = {}
 
-	for _, perk_data in pairs(deck_list_text:children()) do
+	for _, perk_data in pairs(self._controller_cls.perk_text:items()) do
 		table.insert(sorted_perks, perk_data)
 	end
 
@@ -1259,27 +1172,14 @@ function ProfileReborn:set_perk_desk_profile()
 
 	for key, perk in ipairs(sorted_perks) do
 		local perk_text = self:get_specialization_text(perk:layer())
-		local last_panel = deck_list_text_sort:child("perk_text_sort_" .. tostring(last_perk))
 			
-		local text_perk_sort_panel = self.perk_deck.deck_list.text_sort:panel({
+		local text_perk_sort_panel = deck_list_text_sort:canvas():panel({
 			name = "perk_text_sort_" .. tostring(perk:layer()),
-			y = last_panel and last_panel:bottom() or 0,
-			w = deck_list_text_sort:w(),
+			w = deck_list_text_sort:canvas():w(),
 			h = self._filter_list_h,
 			layer = perk:layer()
 		})
-		
-		local text_sort_perk_rect = text_perk_sort_panel:rect({
-			name = "text_sort_perk_rect",
-			color = self._leftlist_text_bg_color,
-			layer = 1,
-			alpha = 0,
-			w = text_perk_sort_panel:w(),
-			h = self._filter_list_h
-		})
-			
-		text_sort_perk_rect:set_center_x(text_perk_sort_panel:w() / 2)
-			
+
 		local text_sort_perk_text = text_perk_sort_panel:text({
 			vertical = "center",
 			valign = "center",
@@ -1297,7 +1197,7 @@ function ProfileReborn:set_perk_desk_profile()
 		text_sort_perk_text:set_center_y(center_y)
 		text_sort_perk_text:set_right(text_perk_sort_panel:right())
 
-		last_perk = perk:layer()
+		deck_list_text_sort:add_item(text_perk_sort_panel, true, perk:layer())
 	end
 	--------------------------------------
 	
@@ -1352,17 +1252,12 @@ function ProfileReborn:set_perk_desk_profile()
 	arrow_left:set_center_y(self.perk_display_mode_panel:h() / 2)
 	arrow_right:set_center_y(self.perk_display_mode_panel:h() / 2)
 	arrow_right:set_right(self.perk_display_mode_panel:w())	
-	for key, panel in ipairs(self.perk_deck.panels) do
+	for key, cls in ipairs(self.perk_deck.panels) do
 		if self.perk_deck.display_mode ~= key then
-			panel:hide()
+			cls:canvas():hide()
 		end
 	end
-	-- local selected = deck_list_icon:rect({
-		-- visible = true,
-		-- w = 5,
-		-- h = deck_list_icon:h()
-	-- })
-	
+
 	local current_profile = managers.multi_profile:current_profile()
 	self:switch_perk(current_profile.perk_deck)
 end
@@ -1479,7 +1374,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 		name = "tool_list_rect",
 		color = Color.black,
 		layer = -50,
-		alpha = 0.3,
+		alpha = 0,
 		w = tool_list:w(),
 		h = tool_list:h()
 	})
@@ -1640,7 +1535,9 @@ function ProfileReborn:set_perks_display_mode(mode)
 	
 	self.perk_deck.display_mode = mode
 	
-	for key, panel in ipairs(self.perk_deck.panels) do
+	for key, cls in ipairs(self.perk_deck.panels) do
+		local panel = cls:canvas()
+
 		if mode ~= key then
 			panel:hide()
 		else
@@ -1796,7 +1693,7 @@ function ProfileReborn:switch_filter(value, base_filter)
 
 		if self._ui.profile[current_ui] and self._ui.profile[current_ui]:y() > (self._panel:h() / 2 - self._bg_h / 2) then
 			local dy = self._ui.profile[current_ui]:y() - (self._panel:h() / 2 - self._bg_h / 2)
-			self:wheel_scroll_bd(-dy)
+			self._controller_cls.profile_list:perform_scroll(-dy)
 		end
 	end
 	
@@ -1804,8 +1701,6 @@ function ProfileReborn:switch_filter(value, base_filter)
 		local child = self._filter:child("bp_filter_" .. method)
 		child:set_visible(child:layer() == self._current_filter)
 	end
-
-	self:update_scrollbar()  --在配置的时候更新一次滚动条（使其最开始的时候可以显示出来）
 end
 
 function ProfileReborn:switch_perk(perk)
@@ -1816,43 +1711,15 @@ function ProfileReborn:switch_perk(perk)
 		for i = 1, #profile do
 			self:set_profile(self._ui.profile, i, profile[i].profile, profile[i].idx)
 		end
-		
-		for _, panel in ipairs(self.perk_deck.deck_list.icon:children()) do
-			panel:set_color(Color.white)
+
+		-- self.perk_deck.panels[self.perk_deck.display_mode]:set_selected(perk)
+
+		for _, cls in ipairs(self.perk_deck.panels) do
+			cls:set_selected_solo(perk)
 		end
+
 		
-		if self.perk_deck.deck_list.icon then
-			local perk_icon = self.perk_deck.deck_list.icon:child("perk_icon_" .. perk)
-			
-			if perk_icon then
-				perk_icon:set_color(Color(88 / 255, 87 / 255, 86 / 255))
-			end
-		end
-		
-		if self.perk_deck.deck_list.text then
-			local perk_text = self.perk_deck.deck_list.text:child("perk_text_" .. perk)
-			
-			if perk_text then
-				perk_text:child("text_perk_rect"):set_alpha(0.75)
-			end
-			
-			if self.perk_deck.current_perk then
-				self.perk_deck.deck_list.text:child("perk_text_" .. self.perk_deck.current_perk):child("text_perk_rect"):set_alpha(0)
-			end
-		end
-		
-		if self.perk_deck.deck_list.text_sort then
-			local perk_text = self.perk_deck.deck_list.text_sort:child("perk_text_sort_" .. perk)
-			
-			if perk_text then
-				perk_text:child("text_sort_perk_rect"):set_alpha(0.75)
-			end
-			
-			if self.perk_deck.current_perk then
-				self.perk_deck.deck_list.text_sort:child("perk_text_sort_" .. self.perk_deck.current_perk):child("text_sort_perk_rect"):set_alpha(0)
-			end
-		end
-		
+
 		self.perk_deck.current_perk = perk
 		managers.mouse_pointer:set_pointer_image("arrow")
 	end
@@ -1876,131 +1743,6 @@ function ProfileReborn:rename_filter(index, new_name)
 	self.custom.filters[index].name = new_name
 	self:save()					
 	self:switch_filter(3)
-end
-
--- 更新右边滚动条的位置和大小
-function ProfileReborn:update_scrollbar()
-	local children = self._ui_panel:children()  -- 获取所有子profile
-	local total_height = 0
-	local visible_height = self._panel:h()
-    
-	-- 计算所有Profile的总高度
-	total_height = self._bg_h * #children
-    
-	-- 判断是否需要显示滚动条
-	if total_height <= visible_height then
-		self._scroll_bar:set_visible(false)
-		return
-	end
-    
-	self._scroll_bar:set_visible(true)
-    
-	-- 计算滚动条高度
-	local scroll_bar_height = visible_height * (visible_height / total_height)
-	
-	-- 计算滚动条位置
-	local scroll_progress = -self._ui.profile[1]:y() / (total_height - visible_height)
-	local scroll_bar_y = scroll_progress * (visible_height - scroll_bar_height)
-	
-	-- 设置滚动条位置和大小
-	self._scroll_bar:set_h(scroll_bar_height)
-	self._scroll_bar:set_right(self._panel:w())
-	self._scroll_bar:set_top(scroll_bar_y)
-end
-
-function ProfileReborn:wheel_scroll_bd(dy)
-	local profiles = self._ui.profile
-
-	if self._bg_h * #profiles >= self._panel:h() then
-		if dy > 0 then
-			dy = profiles[1]:top() + dy >= 0 and -profiles[1]:top() or dy
-		else
-			if profiles[#profiles]:bottom() + dy <= self._panel:h() then
-				dy = self._panel:h() - profiles[#profiles]:bottom()
-			end
-		end
-
-		for idx, panel in ipairs(profiles) do
-			panel:set_y(panel:top() + dy)
-		end
-	end
-end
-
-function ProfileReborn:wheel_scroll_perk(dy)
-	if self.perk_deck.display_mode == 1 then
-		local icon_perk_panels = self.perk_deck.deck_list.icon:children()
-		
-		if self.perk_deck.deck_list.icon:w() * #icon_perk_panels >= self.perk_deck.deck_list.icon:h() then
-			local minimum_perk
-			local last_perk
-
-			minimum_perk = icon_perk_panels[1]
-			last_perk = icon_perk_panels[#icon_perk_panels]
-			
-			if dy > 0 then
-				if minimum_perk:y() + dy >= 0 then
-					dy = -minimum_perk:y()
-				end
-			else
-				if last_perk:bottom() + dy <= self._panel:h() then
-					dy = self.perk_deck.deck_list.icon:h() - last_perk:bottom()
-				end			
-			end
-			
-			for _, panel in ipairs(icon_perk_panels) do
-				panel:set_y(panel:y() + dy)
-			end
-		end
-	elseif self.perk_deck.display_mode == 2 then
-		local text_perk_panels = self.perk_deck.deck_list.text:children()
-		
-		if self._filter_list_h * #text_perk_panels >= self.perk_deck.deck_list.text:h() then
-			local minimum
-			local last
-			
-			minimum = text_perk_panels[1]
-			last = text_perk_panels[#text_perk_panels]
-			
-			if dy > 0 then
-				if minimum:y() + dy >= 0 then
-					dy = -minimum:y()
-				end
-			else
-				if last:bottom() + dy <= self._panel:h() then
-					dy = self.perk_deck.deck_list.text:h() - last:bottom()
-				end
-			end
-			
-			for _, panel in ipairs(text_perk_panels) do
-				panel:set_y(panel:y() + dy)
-			end
-		end
-	elseif self.perk_deck.display_mode == 3 then
-		--天赋模式左列表display_mode 3时的滚轮上下滑
-		local text_sort_perk_panels = self.perk_deck.deck_list.text_sort:children()  --获取text_sort的所有子级
-		
-		if self._filter_list_h * #text_sort_perk_panels >= self.perk_deck.deck_list.text:h() then
-			local minimum
-			local last
-			
-			minimum = text_sort_perk_panels[1]
-			last = text_sort_perk_panels[#text_sort_perk_panels]
-			
-			if dy > 0 then
-				if minimum:y() + dy >= 0 then
-					dy = -minimum:y()
-				end
-			else
-				if last:bottom() + dy <= self._panel:h() then
-					dy = self.perk_deck.deck_list.text:h() - last:bottom()
-				end
-			end
-			
-			for _, panel in ipairs(text_sort_perk_panels) do
-				panel:set_y(panel:y() + dy)
-			end
-		end
-	end
 end
 
 function ProfileReborn:wheel_scroll_custom(dy)
