@@ -2,9 +2,13 @@
 	"name" : "Profile Reborn",
 	"description" : "",
 	"author" : "MetroLine",   
-	"version" : "1.021",
+	"version" : "1.021.1",
 	"blt_version": 2,
 	"hooks" : [
+		{
+			"hook_id" : "lib/managers/menumanager",
+			"script_path" : "lua/ControllerUI.lua"
+		},
 		{
 			"hook_id" : "lib/managers/menumanager",
 			"script_path" : "lua/ProfileReborn.lua"
