@@ -72,8 +72,6 @@ function ProfileReborn:active()
 	self._canvas = self._controller_cls.profile_list:canvas()
 
 	self._panel:set_center(self._ws:panel():center_x(), self._ws:panel():center_y())
-
-	self._ui_panel = self._canvas
 	
 	self:load()
 
@@ -87,8 +85,14 @@ function ProfileReborn:active()
 	self._filter:set_left(self._panel:left())
 	self._filter:set_top(self._panel:bottom() + 2)
 	local menu_arrows_texture = "guis/textures/menu_arrows"
-	local arrow_left = self._filter:bitmap({
+
+	local arrow_left_panel = self._filter:panel({
 		name = "arrow_left",
+		w = self._filter:h(),
+		h = self._filter:h()
+	})
+
+	local arrow_left = arrow_left_panel:bitmap({
 		texture = menu_arrows_texture,
 		layer = 2,
 		texture_rect = {
@@ -98,9 +102,24 @@ function ProfileReborn:active()
 			24
 		}
 	})
-	
-	local arrow_right = self._filter:bitmap({
+
+	arrow_left:set_left(arrow_left_panel:left())
+	arrow_left:set_center_y(self._filter:h() / 2)
+
+	self._controller_cls.set_filter_left = PRebornButton:new(arrow_left_panel, {
+		bg = false,
+		callback = function()
+			self:switch_filter(self._current_filter - 1)
+		end
+	})
+
+	local arrow_right_panel = self._filter:panel({
 		name = "arrow_right",
+		w = self._filter:h(),
+		h = self._filter:h()
+	})
+
+	local arrow_right = arrow_right_panel:bitmap({
 		texture = menu_arrows_texture,
 		layer = 2,
 		rotation = 180,
@@ -111,7 +130,17 @@ function ProfileReborn:active()
 			24
 		}
 	})
-	
+
+	arrow_right:set_right(arrow_left_panel:right())
+	arrow_right:set_center_y(self._filter:h() / 2)
+
+	self._controller_cls.set_filter_right = PRebornButton:new(arrow_right_panel, {
+		bg = false,
+		callback = function()
+			self:switch_filter(self._current_filter + 1)
+		end
+	})
+
 	for layer, method in ipairs(self.filter_method) do
 		self._filter:text({
 			name = "bp_filter_" .. method,
@@ -128,9 +157,9 @@ function ProfileReborn:active()
 		})
 	end
 	
-	arrow_left:set_center_y(self._filter:h() / 2)
-	arrow_right:set_center_y(self._filter:h() / 2)
-	arrow_right:set_right(self._filter:w())
+	arrow_left_panel:set_center_y(self._filter:h() / 2)
+	arrow_right_panel:set_center_y(self._filter:h() / 2)
+	arrow_right_panel:set_right(self._filter:w())
 	self._filter_bg = self._filter:rect({
 		color = Color.black,
 		alpha = 0.9,
@@ -169,8 +198,6 @@ function ProfileReborn:active()
 	-- self:create_side(self._canvas)
 	self:create_side(self._filter)
 	
-	self._ui = {}
-	self._ui.profile = {}
 	self.profile = {}
 	self.perk_deck = {}
 	self.perk_deck.perks = {}
@@ -189,7 +216,7 @@ function ProfileReborn:active()
 	self:show()
 end
 
-function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
+function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 	if not profile then
 		return
 	end
@@ -202,16 +229,25 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 		text = text
 	end
 	
-	ui_panel[idx] = self._ui_panel:panel({
+	self._controller_cls["profile" .. idx] = PRebornButton:new(self._canvas, {
 		layer = profile_idx or 0, --借用层级，存取profile编号
 		w = self._rect:w(),
-		h = self._bg_h
+		h = self._bg_h,
+		bg = false,
+		callback = function()
+			if alive(self._ws) then
+				managers.multi_profile:set_current_profile(profile_idx or idx)
+				self:hide()
+			end
+		end
 		-- y = self._rect:top() + self._bg_h * idx - self._bg_h + (ui_panel[1] and ui_panel[1]:y() or 0)
 	})
 
-	self._controller_cls.profile_list:add_item(ui_panel[idx])
+	local profile_cls = self._controller_cls["profile" .. idx]
+	local panel = profile_cls:panel()
 
-	local panel = ui_panel[idx]
+	self._controller_cls.profile_list:add_item(panel)
+
 	local profile_bg = panel:bitmap({
 		visible = false,
 		texture = "guis/textures/menu_selected",
@@ -295,45 +331,111 @@ function ProfileReborn:set_profile(ui_panel, idx, profile, profile_idx)
 	left_line:set_left(0)
 	right_line:set_right(panel:w())
 
-	local remove_icon = panel:bitmap({
+	self._controller_cls["remove_icon" .. idx] = PRebornButton:new(panel, {
 		name = "remove_icon" .. idx,
 		visible = false,
-		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
-		alpha = 0.5,
 		w = 40,
 		h = 40,
-		layer = 3
+		layer = 3,
+		bg = false,
+		selection_mode = 2,
+		callback = function()
+			local current_filter = self:get_current_custom_filter()
+
+			table.remove(current_filter.profiles, idx)
+			self:switch_filter(3, self.custom.current_custom_filter)
+		end
+	})
+
+	local remove_icon_panel = self._controller_cls["remove_icon" .. idx]:panel()
+
+	local remove_icon = remove_icon_panel:bitmap({
+		w = 40,
+		h = 40,
+		texture = "guis/textures/pd2/profile_rebvorn_none_icon",
 	})
 	
-	remove_icon:set_bottom(panel:h()-5)
-	remove_icon:set_right(panel:right())
+	remove_icon_panel:set_bottom(panel:h()-5)
+	remove_icon_panel:set_right(panel:right())
+	remove_icon:set_center_y(remove_icon_panel:h() / 2)
 	
-	local down_icon = panel:bitmap({
+	self._controller_cls["down_icon" .. idx] = PRebornButton:new(panel, {
 		name = "down_icon" .. idx,
 		visible = false,
-		texture = "guis/textures/pd2/profile_rebvorn_down_icon",
-		alpha = 0.5,
 		w = 40,
 		h = 40,
-		layer = 3
+		layer = 3,
+		bg = false,
+		selection_mode = 2,
+		callback = function()
+			if idx < #self:profiles_panel() then
+				local f = idx
+				local t = idx + 1
+
+				self:swap_profile(f, t)
+				self:switch_filter(3, self.custom.current_custom_filter)
+			end
+		end
+	})
+
+	local down_icon_panel = self._controller_cls["down_icon" .. idx]:panel()
+
+	local down_icon = down_icon_panel:bitmap({
+		w = 40,
+		h = 40,
+		texture = "guis/textures/pd2/profile_rebvorn_down_icon",
 	})
 	
-	down_icon:set_bottom(panel:h()-5)
-	down_icon:set_right(remove_icon:left())
-	
-	local up_icon = panel:bitmap({
+	down_icon_panel:set_bottom(panel:h()-5)
+	down_icon_panel:set_right(remove_icon_panel:left())
+	down_icon:set_center_y(down_icon_panel:h() / 2)
+
+	self._controller_cls["up_icon" .. idx] = PRebornButton:new(panel, {
 		name = "up_icon" .. idx,
 		visible = false,
-		texture = "guis/textures/pd2/profile_rebvorn_up_icon",
-		alpha = 0.5,
 		w = 40,
 		h = 40,
-		layer = 3
+		layer = 3,
+		bg = false,
+		selection_mode = 2,
+		callback = function()
+			if idx > 1 then
+				local f = idx
+				local t = idx - 1
+						
+				self:swap_profile(f, t)
+				self:switch_filter(3, self.custom.current_custom_filter)
+			end
+		end
+	})
+
+	local up_icon_panel = self._controller_cls["up_icon" .. idx]:panel()
+
+	local up_icon = up_icon_panel:bitmap({
+		w = 40,
+		h = 40,
+		texture = "guis/textures/pd2/profile_rebvorn_up_icon",
 	})
 	
-	up_icon:set_bottom(panel:h()-5)
-	up_icon:set_right(down_icon:left())
-	
+	up_icon_panel:set_bottom(panel:h()-5)
+	up_icon_panel:set_right(down_icon_panel:left())
+	up_icon:set_center_y(up_icon_panel:h() / 2)
+
+	local cls = self._controller_cls["profile" .. idx]
+	local old_inside_func = cls.inside
+
+	function cls:inside(x, y)
+		if not managers.multi_profile.profile_reborn._panel:inside(x, y) then
+			return
+		end
+
+		if remove_icon_panel:inside(x, y) or down_icon_panel:inside(x, y) or up_icon_panel:inside(x, y) then
+			return
+		elseif alive(cls:panel()) then
+			return old_inside_func(self, x, y)
+		end
+	end
+
 	local text_color = self._profile_name_color
 	
 	if profile_idx == managers.multi_profile._global._current_profile then
@@ -507,6 +609,10 @@ function ProfileReborn:create_side(panel)
 	BoxGuiObject:_create_side(panel, "bottom", 1, false, false)
 end
 
+function ProfileReborn:profiles_panel()
+	return self._controller_cls.profile_list:items()
+end
+
 function ProfileReborn:show()
 	self._bg:show()
 	self._panel:show()
@@ -569,10 +675,6 @@ function ProfileReborn:reset_panel()
 	if self._current_filter ~= 2 then
 		if self._ws:panel():child("left_list") then
 			self._ws:panel():remove(self._ws:panel():child("left_list"))
-
-			self._controller_cls.perk_icon = nil
-			self._controller_cls.perk_text = nil
-			self._controller_cls.perk_text_sort = nil
 		end
 
 		self.perk_deck.current_perk = nil
@@ -597,9 +699,6 @@ end
 --重置所有和profile列表有关的内容
 function ProfileReborn:reset_profile_panels()
 	self._controller_cls.profile_list:clear()
-	-- self._canvas:remove(self._ui_panel)
-	-- self._ui_panel = self._canvas:panel()
-	self._ui.profile = {}
 	self.profile = {}
 end
 
@@ -619,12 +718,14 @@ function ProfileReborn:mouse_moved(o, x, y)
 	self._touch_ui = nil
 
 	for _, cls in pairs(self._controller_cls) do
-		self._mouse_inside = cls:mouse_moved(o, x, y) and true or self._mouse_inside
+		if alive(cls:panel()) then
+			self._mouse_inside = (cls.mouse_moved and cls:mouse_moved(o, x, y)) and true or self._mouse_inside
+		end
 	end
 
 	-- if self._panel:inside(self._mouse_x, self._mouse_y) then
-	for idx, box in pairs(self._ui.profile) do
-		local profile = self._ui.profile[idx]
+	for idx, box in pairs(self:profiles_panel()) do
+		local profile = self:profiles_panel()[idx]
 		if box:inside(self._mouse_x, self._mouse_y) and self._mouse_y > self._panel:y() and self._mouse_y < (self._panel:y() + self._panel:h()) then
 			self._mouse_inside = true
 			self._touch_profile = box:layer() == 0 and idx or box:layer()
@@ -650,12 +751,7 @@ function ProfileReborn:mouse_moved(o, x, y)
 		end
 	end
 	-- end
-	
-	-- filter arrow
-	if self._filter:child("arrow_left"):inside(x, y) or self._filter:child("arrow_right"):inside(x, y) then
-		self._mouse_inside = true
-	end
-	
+
 	-- deck list
 	if self._current_filter == 2 then
 
@@ -696,24 +792,6 @@ function ProfileReborn:mouse_moved(o, x, y)
 				panel:set_alpha(0.5)
 			end
 		end
-		
-		local profile = self._ui.profile[self._touch_ui]
-		
-		if profile and profile:inside(x, y) then
-			local little_icons = {
-				profile:child("remove_icon" .. self._touch_ui),
-				profile:child("up_icon" .. self._touch_ui),
-				profile:child("down_icon" .. self._touch_ui)
-			}
-			
-			for _, icon in ipairs(little_icons) do
-				if icon:inside(x, y) then
-					icon:set_alpha(1)
-				else
-					icon:set_alpha(0.5)
-				end
-			end
-		end
 	end
 	
 	if self._mouse_inside then
@@ -741,52 +819,16 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		return
 	end
 
-	for _, cls in pairs(self._controller_cls) do
-		cls:mouse_pressed(button, x, y)
+	local clses = self:table_clone(self._controller_cls)
+	for k, cls in pairs(clses) do
+		if alive(cls:panel()) then
+			cls:mouse_pressed(button, x, y)
+		end
 	end
 
-	local ccf = self.custom.current_custom_filter
+	-- local ccf = self.custom.current_custom_filter
 
 	if button == Idstring("0") then
-		if self._touch_profile then
-			local profile = self._ui.profile[self._touch_ui]
-			if self._current_filter == 3 then
-				if profile:child("remove_icon" .. self._touch_ui):inside(x, y) then
-					local current_filter = self:get_current_custom_filter()
-					local profiles = current_filter.profiles
-
-					table.remove(profiles, self._touch_ui)
-					self:switch_filter(3, ccf)
-				elseif profile:child("up_icon" .. self._touch_ui):inside(x, y) then
-					if self._touch_ui > 1 then
-						local f = self._touch_ui
-						local t = self._touch_ui - 1
-						
-						self:swap_profile(f, t)
-						self:switch_filter(3, ccf)
-					end
-				elseif profile:child("down_icon" .. self._touch_ui):inside(x, y) then
-					if self._touch_ui < #self._ui.profile then
-						local f = self._touch_ui
-						local t = self._touch_ui + 1
-						
-						self:swap_profile(f, t)
-						self:switch_filter(3, ccf)
-					end
-				else
-					managers.multi_profile:set_current_profile(self._touch_profile)
-					self:hide()
-				end
-			else
-				managers.multi_profile:set_current_profile(self._touch_profile)
-				self:hide()			
-			end
-		elseif self._filter:child("arrow_left"):inside(x, y) then		
-			self:switch_filter(self._current_filter - 1)
-		elseif self._filter:child("arrow_right"):inside(x, y) then
-			self:switch_filter(self._current_filter + 1)
-		end
-		
 		if self._current_filter == 2 then
 			if self.perk_display_mode_panel:child("arrow_left"):inside(x, y) then		
 				self:set_perks_display_mode(self.perk_deck.display_mode - 1)
@@ -980,7 +1022,7 @@ end
 
 function ProfileReborn:mouse_released(o, button, x, y)
 	for _, cls in pairs(self._controller_cls) do
-		cls:mouse_released(button, x, y)
+		local released = cls.mouse_released and cls:mouse_released(button, x, y)
 	end
 end
 
@@ -1023,7 +1065,7 @@ end
 
 function ProfileReborn:set_default_profile()
 	for idx, profile in pairs(managers.multi_profile._global._profiles) do
-		self:set_profile(self._ui.profile, idx, profile, idx)
+		self:set_profile(idx, profile, idx)
 	end
 end
 
@@ -1061,7 +1103,7 @@ function ProfileReborn:set_perk_desk_profile()
 		rect_color = self._leftlist_text_bg_color
 	})
 
-	--创建文字排序的主panel
+	-- 创建文字排序的主panel
 	self._controller_cls.perk_text_sort = PRebornScrollListSimple:new(leftlist_panel, {
 		layer = self._ui_layer + 1,
 		w = 200,
@@ -1083,6 +1125,7 @@ function ProfileReborn:set_perk_desk_profile()
 	deck_list_icon:panel():set_top(self._panel:top())
 	deck_list_icon:set_callback(function(idx)
 		self:switch_perk(idx)
+		managers.mouse_pointer:set_pointer_image("arrow")
 	end)
 
 	local deck_list_text = self.perk_deck.panels[2]
@@ -1090,6 +1133,7 @@ function ProfileReborn:set_perk_desk_profile()
 	deck_list_text:panel():set_top(self._panel:top())
 	deck_list_text:set_callback(function(idx)
 		self:switch_perk(idx)
+		managers.mouse_pointer:set_pointer_image("arrow")
 	end)
 
 	local deck_list_text_sort = self.perk_deck.panels[3]
@@ -1097,6 +1141,7 @@ function ProfileReborn:set_perk_desk_profile()
 	deck_list_text_sort:panel():set_top(self._panel:top())
 	deck_list_text_sort:set_callback(function(idx)
 		self:switch_perk(idx)
+		managers.mouse_pointer:set_pointer_image("arrow")
 	end)
 	
 	self.perk_deck.display_mode = self.save_data.perk_deck_display_mode or 1
@@ -1199,7 +1244,7 @@ function ProfileReborn:set_perk_desk_profile()
 
 		deck_list_text_sort:add_item(text_perk_sort_panel, true, perk:layer())
 	end
-	--------------------------------------
+	------------------------------------
 	
 	self.perk_display_mode_panel = self._ws:panel():panel({
 		layer = self._ui_layer,
@@ -1211,6 +1256,7 @@ function ProfileReborn:set_perk_desk_profile()
 	self.perk_display_mode_panel:set_top(self._panel:bottom() + 2)
 	
 	local menu_arrows_texture = "guis/textures/menu_arrows"
+
 	local arrow_left = self.perk_display_mode_panel:bitmap({
 		name = "arrow_left",
 		texture = menu_arrows_texture,
@@ -1314,7 +1360,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 		filters[base_filter].panel:child("custom_filter_rect"):set_alpha(0.75)
 		
 		for key, data in pairs(filters[base_filter].profiles) do
-			self:set_profile(self._ui.profile, key, data.profile, data.idx)
+			self:set_profile(key, data.profile, data.idx)
 		end
 	end
 
@@ -1554,7 +1600,7 @@ function ProfileReborn:add_profile_callback(profile, idx)
 	local filter = self.custom.filters[self.custom.current_custom_filter]
 	local new_profile = #filter.profiles + 1
 	
-	self:set_profile(self._ui.profile, new_profile, profile, idx)
+	self:set_profile(new_profile, profile, idx, true)
 
 	filter.profiles[new_profile] = {
 		profile = profile,
@@ -1678,10 +1724,10 @@ function ProfileReborn:switch_filter(value, base_filter)
 	end
 	
 
-	if self._bg_h * #self._ui.profile >= self._panel:h() then
+	if self._bg_h * #self:profiles_panel() >= self._panel:h() then
 		local current_ui
 		if self._current_filter ~= 1 then
-			for k, ui in ipairs(self._ui.profile) do
+			for k, ui in ipairs(self:profiles_panel()) do
 				if ui:layer() == managers.multi_profile._global._current_profile then
 					current_ui = k
 					break
@@ -1691,8 +1737,8 @@ function ProfileReborn:switch_filter(value, base_filter)
 			current_ui = managers.multi_profile._global._current_profile
 		end
 
-		if self._ui.profile[current_ui] and self._ui.profile[current_ui]:y() > (self._panel:h() / 2 - self._bg_h / 2) then
-			local dy = self._ui.profile[current_ui]:y() - (self._panel:h() / 2 - self._bg_h / 2)
+		if self:profiles_panel()[current_ui] and self:profiles_panel()[current_ui]:y() > (self._panel:h() / 2 - self._bg_h / 2) then
+			local dy = self:profiles_panel()[current_ui]:y() - (self._panel:h() / 2 - self._bg_h / 2)
 			self._controller_cls.profile_list:perform_scroll(-dy)
 		end
 	end
@@ -1709,7 +1755,7 @@ function ProfileReborn:switch_perk(perk)
 		self:reset_panel()
 	
 		for i = 1, #profile do
-			self:set_profile(self._ui.profile, i, profile[i].profile, profile[i].idx)
+			self:set_profile(i, profile[i].profile, profile[i].idx)
 		end
 
 		-- self.perk_deck.panels[self.perk_deck.display_mode]:set_selected(perk)
@@ -1721,7 +1767,6 @@ function ProfileReborn:switch_perk(perk)
 		
 
 		self.perk_deck.current_perk = perk
-		managers.mouse_pointer:set_pointer_image("arrow")
 	end
 end
 
@@ -1731,7 +1776,7 @@ function ProfileReborn:switch_custom(key)
 		self:reset_profile_panels()
 	
 		for i = 1, #profile do
-			self:set_profile(self._ui.profile, i, profile[i].profile, profile[i].idx)
+			self:set_profile(i, profile[i].profile, profile[i].idx, true)
 		end
 		
 		self.custom.current_custom_filter = key
@@ -2089,4 +2134,16 @@ function ProfileReborn:Saturation(color)
 	b = max ~= b and b / 3 or b * 2
 
 	return Color(r, g, b)
+end
+
+--复制table而不是引用
+---@param tb:table
+function ProfileReborn:table_clone(tb)
+	local new_tb = {}
+
+	for k, cls in pairs(tb) do
+		new_tb[k] = cls
+	end
+
+	return new_tb
 end
