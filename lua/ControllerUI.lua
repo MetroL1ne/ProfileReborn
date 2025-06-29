@@ -3,18 +3,12 @@ PRebornButton = PRebornButton or class()
 
 function PRebornButton:init(panel, data)
 	self.class = "button"
+	self._panel = panel:panel(data)
 	self._parent = panel
-	self._can_press = not (tostring(data.can_press) == "false") and true or false
 
-	self._panel = panel:panel({
-		name = data.name,
-		visible = data.visible,
-		layer = data.layer,
-		w = data.w,
-		h = data.h,
-		x = data.x,
-		y = data.y
-	})
+	self._can_press = not (tostring(data.can_press) == "false") and true or false
+	self._bg = not (tostring(data.can_press) == "false") and data.selection_mode == 1 or false
+	self._selection_mode = data.selection_mode or 1
 
 	local rect = self._panel:rect({
 		name = "rect",
@@ -40,6 +34,48 @@ function PRebornButton:init(panel, data)
 
 	text:set_left(self._panel:left())
 	text:set_center_y(self._panel:h() / 2)
+
+	if data.selection_mode == 4 then
+		self._side = {}
+
+		self._side[1] = BoxGuiObject:_create_side(self._panel, "left", 1, false, false)
+		self._side[2] = BoxGuiObject:_create_side(self._panel, "right", 1, false, false)
+		self._side[3] = BoxGuiObject:_create_side(self._panel, "top", 1, false, false)
+		self._side[4] = BoxGuiObject:_create_side(self._panel, "bottom", 1, false, false)
+	elseif data.selection_mode == 5 then
+		self._line = {}
+
+		self._line[1] = self._panel:rect({
+			visible = false,
+			w = self._panel:w(),
+			h = 2
+		})
+		
+		self._line[2] = self._panel:rect({
+			visible = false,
+			w = self._panel:w(),
+			h = 2
+		})
+		
+		self._line[3] = self._panel:rect({
+			visible = false,
+			w = 2,
+			h = self._panel:h()
+		})
+		
+		self._line[4] = self._panel:rect({
+			visible = false,
+			w = 2,
+			h = self._panel:h()
+		})
+			
+		self._line[1]:set_top(0)
+		self._line[2]:set_bottom(self._panel:h())
+		self._line[3]:set_left(0)
+		self._line[4]:set_right(self._panel:w())
+	end
+
+	self._callback = data.callback
 end
 
 function PRebornButton:panel()
@@ -68,12 +104,51 @@ function PRebornButton:mouse_moved(o, x, y)
 	end
 
 	local mouse_inside = false
+	if self._selection_mode == 1 or self._bg then
+		if self:inside(x, y) then
+			if self._bg then
+				self._panel:child("rect"):set_visible(true)
+			end
 
-	if self:inside(x, y) then
-		self._panel:child("rect"):set_visible(true)
-		mouse_inside = true
-	else
-		self._panel:child("rect"):set_visible(false)
+			if self._selection_mode == 1 then
+				mouse_inside = true
+			end
+		else
+			if self._bg then
+				self._panel:child("rect"):set_visible(false)
+			end
+		end
+	end
+
+	if self._selection_mode == 2 then
+		if self:inside(x, y) then
+			self._panel:set_alpha(1)
+		else
+			self._panel:set_alpha(0.5)
+		end
+	elseif self._selection_mode == 3 then
+		if self:inside(x, y) then
+			self._panel:set_alpha(0.5)
+		else
+			self._panel:set_alpha(1)
+		end
+	elseif self._selection_mode == 4 then
+		for _ , side_panel in pairs(self._side) do
+			if self:inside(x, y) then
+				managers.mission._fading_debug_output:script().log(tostring(true), Color.white)
+				side_panel:set_visible(true)
+			else
+				side_panel:set_visible(false)
+			end
+		end
+	elseif self._selection_mode == 5 then
+		for _ , line_panel in pairs(self._line) do
+			if self:inside(x, y) then
+				line_panel:set_visible(true)
+			else
+				line_panel:set_visible(false)
+			end
+		end
 	end
 
 	return mouse_inside
@@ -93,7 +168,7 @@ function PRebornButton:mouse_released(button, x, y)
 end
 
 function PRebornButton:inside(x, y)
-	if self._panel:inside(x, y) then
+	if self._panel:visible() and self._panel:inside(x, y) then
 		return true, "link"
 	end
 
@@ -108,15 +183,7 @@ function PRebornToggleButton:init(panel, data)
 	self._parent = panel
 	self._state = data.state or false
 
-	self._panel = panel:panel({
-		name = data.name,
-		visible = data.visible,
-		layer = data.layer,
-		w = data.w,
-		h = data.h,
-		x = data.x,
-		y = data.y
-	})
+	self._panel = panel:panel(data)
 
 	local rect = self._panel:rect({
 		name = "rect",
@@ -159,6 +226,8 @@ function PRebornToggleButton:init(panel, data)
 
 	tickbox_text:set_left(self._panel:left())
 	tickbox_text:set_center_y(self._panel:h() / 2)
+
+	self._callback = data.callback
 end
 
 function PRebornToggleButton:panel()
@@ -244,15 +313,7 @@ function PRebornInputBox:init(panel, ws, data)
 	self._max_length = data.max_length or 100
 	self._num_only = data.num_only
 
-	self._panel = panel:panel({
-		name = data.name,
-		visible = data.visible,
-		layer = data.layer,
-		w = data.w,
-		h = data.h,
-		x = data.x,
-		y = data.y
-	})
+	self._panel = panel:panel(data)
 
 	self._name_text = self._panel:text({
 		name = "name_text",
@@ -305,6 +366,8 @@ function PRebornInputBox:init(panel, ws, data)
 		layer = 2,
 		color = Color(1, 1, 1, 1)
 	})
+
+	self._callback = data.callback
 end
 
 function PRebornInputBox:panel()
@@ -632,6 +695,7 @@ function PRebornScrollList:init(panel, data, canvas_config, ...)
 	title:set_right(self:canvas():w())
 	title:set_top(self:canvas():top())
 
+	self._callback = data.callback
 end
 
 function PRebornScrollList:panel()
@@ -704,6 +768,8 @@ function PRebornScrollListSimple:init(panel, data)
 		w = self._panel:w(),
 		h = 0
 	})
+
+	self._callback = data.callback
 end
 
 function PRebornScrollListSimple:panel()
@@ -849,7 +915,7 @@ function PRebornScrollListSimple:mouse_pressed(button, x, y)
 		return
 	end
 
-	if not self._canvas:inside(x, y) then
+	if not self._panel:inside(x, y) then
 		return
 	end
 
