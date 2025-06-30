@@ -76,21 +76,33 @@ function ProfileReborn:active()
 	self:load()
 
 	self._current_filter = self.save_data and self.save_data.current_filter or 1
-	self._filter = self._ws:panel():panel({
+	self._controller_cls.filter = PRebornButton:new(self._ws:panel(), {
 		layer = self._ui_layer,
 		w = 150,
-		h = 30
+		h = 30,
+		bg = true,
+		bg_color = self._filter_bg_color,
+		bg_alpha = 0.3,
+		bg_layer = -49,
+		can_press = false
 	})
 	
+	self._filter = self._controller_cls.filter:panel()
+
 	self._filter:set_left(self._panel:left())
 	self._filter:set_top(self._panel:bottom() + 2)
 	local menu_arrows_texture = "guis/textures/menu_arrows"
 
-	local arrow_left_panel = self._filter:panel({
-		name = "arrow_left",
+	self._controller_cls.set_filter_left = PRebornButton:new(self._filter, {
 		w = self._filter:h(),
-		h = self._filter:h()
+		h = self._filter:h(),
+		selection_mode = 2,
+		callback = function()
+			self:switch_filter(self._current_filter - 1)
+		end
 	})
+
+	local arrow_left_panel = self._controller_cls.set_filter_left:panel()
 
 	local arrow_left = arrow_left_panel:bitmap({
 		texture = menu_arrows_texture,
@@ -103,21 +115,19 @@ function ProfileReborn:active()
 		}
 	})
 
-	arrow_left:set_left(arrow_left_panel:left())
-	arrow_left:set_center_y(self._filter:h() / 2)
+	arrow_left_panel:set_center_y(self._filter:h() / 2)
+	arrow_left:set_center_y(arrow_left_panel:h() / 2)
 
-	self._controller_cls.set_filter_left = PRebornButton:new(arrow_left_panel, {
-		bg = false,
+	self._controller_cls.set_filter_right = PRebornButton:new(self._filter, {
+		w = self._filter:h(),
+		h = self._filter:h(),
+		selection_mode = 2,
 		callback = function()
-			self:switch_filter(self._current_filter - 1)
+			self:switch_filter(self._current_filter + 1)
 		end
 	})
 
-	local arrow_right_panel = self._filter:panel({
-		name = "arrow_right",
-		w = self._filter:h(),
-		h = self._filter:h()
-	})
+	local arrow_right_panel = self._controller_cls.set_filter_right:panel()
 
 	local arrow_right = arrow_right_panel:bitmap({
 		texture = menu_arrows_texture,
@@ -131,15 +141,10 @@ function ProfileReborn:active()
 		}
 	})
 
-	arrow_right:set_right(arrow_left_panel:right())
-	arrow_right:set_center_y(self._filter:h() / 2)
-
-	self._controller_cls.set_filter_right = PRebornButton:new(arrow_right_panel, {
-		bg = false,
-		callback = function()
-			self:switch_filter(self._current_filter + 1)
-		end
-	})
+	arrow_right_panel:set_right(self._filter:w())
+	arrow_right_panel:set_center_y(self._filter:h() / 2)
+	arrow_right:set_right(arrow_right_panel:w())
+	arrow_right:set_center_y(arrow_right_panel:h() / 2)
 
 	for layer, method in ipairs(self.filter_method) do
 		self._filter:text({
@@ -157,9 +162,6 @@ function ProfileReborn:active()
 		})
 	end
 	
-	arrow_left_panel:set_center_y(self._filter:h() / 2)
-	arrow_right_panel:set_center_y(self._filter:h() / 2)
-	arrow_right_panel:set_right(self._filter:w())
 	self._filter_bg = self._filter:rect({
 		color = Color.black,
 		alpha = 0.9,
@@ -221,6 +223,8 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 		return
 	end
 	
+	local tool_visible = tool or false
+
 	self.profile[idx] = profile
 	
 	local text = profile.name or "Profile " .. profile_idx or idx
@@ -233,7 +237,7 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 		layer = profile_idx or 0, --借用层级，存取profile编号
 		w = self._rect:w(),
 		h = self._bg_h,
-		bg = false,
+		selection_mode = 5,
 		callback = function()
 			if alive(self._ws) then
 				managers.multi_profile:set_current_profile(profile_idx or idx)
@@ -297,39 +301,6 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 			profile_icon_23_bg:set_center_x(profile_icon_bg:center_x())
 		end
 	end
-	
-	local top_line = panel:rect({
-		name = "top_line" .. idx,
-		visible = false,
-		w = panel:w(),
-		h = 2
-	})
-	
-	local bottom_line = panel:rect({
-		name = "bottom_line" .. idx,
-		visible = false,
-		w = panel:w(),
-		h = 2
-	})
-	
-	local left_line = panel:rect({
-		name = "left_line" .. idx,
-		visible = false,
-		w = 2,
-		h = panel:h()
-	})
-	
-	local right_line = panel:rect({
-		name = "right_line" .. idx,
-		visible = false,
-		w = 2,
-		h = panel:h()
-	})
-		
-	top_line:set_top(0)
-	bottom_line:set_bottom(panel:h())
-	left_line:set_left(0)
-	right_line:set_right(panel:w())
 
 	self._controller_cls["remove_icon" .. idx] = PRebornButton:new(panel, {
 		name = "remove_icon" .. idx,
@@ -337,13 +308,13 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 		w = 40,
 		h = 40,
 		layer = 3,
-		bg = false,
 		selection_mode = 2,
 		callback = function()
 			local current_filter = self:get_current_custom_filter()
 
 			table.remove(current_filter.profiles, idx)
 			self:switch_filter(3, self.custom.current_custom_filter)
+			managers.mouse_pointer:set_pointer_image("arrow")
 		end
 	})
 
@@ -365,7 +336,6 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 		w = 40,
 		h = 40,
 		layer = 3,
-		bg = false,
 		selection_mode = 2,
 		callback = function()
 			if idx < #self:profiles_panel() then
@@ -374,6 +344,7 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 
 				self:swap_profile(f, t)
 				self:switch_filter(3, self.custom.current_custom_filter)
+				managers.mouse_pointer:set_pointer_image("arrow")
 			end
 		end
 	})
@@ -396,7 +367,6 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 		w = 40,
 		h = 40,
 		layer = 3,
-		bg = false,
 		selection_mode = 2,
 		callback = function()
 			if idx > 1 then
@@ -405,6 +375,7 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 						
 				self:swap_profile(f, t)
 				self:switch_filter(3, self.custom.current_custom_filter)
+				managers.mouse_pointer:set_pointer_image("arrow")
 			end
 		end
 	})
@@ -429,9 +400,21 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool)
 			return
 		end
 
+		if tool_visible then
+			if self:panel():inside(x, y) then
+				remove_icon_panel:set_visible(true)
+				down_icon_panel:set_visible(true)
+				up_icon_panel:set_visible(true)
+			else
+				remove_icon_panel:set_visible(false)
+				down_icon_panel:set_visible(false)
+				up_icon_panel:set_visible(false)				
+			end
+		end
+
 		if remove_icon_panel:inside(x, y) or down_icon_panel:inside(x, y) or up_icon_panel:inside(x, y) then
 			return
-		elseif alive(cls:panel()) then
+		else
 			return old_inside_func(self, x, y)
 		end
 	end
@@ -714,8 +697,6 @@ function ProfileReborn:mouse_moved(o, x, y)
 	self._mouse_x = x
 	self._mouse_y = y
 	self._mouse_inside = false
-	self._touch_profile = nil	
-	self._touch_ui = nil
 
 	for _, cls in pairs(self._controller_cls) do
 		if alive(cls:panel()) then
@@ -723,44 +704,6 @@ function ProfileReborn:mouse_moved(o, x, y)
 		end
 	end
 
-	-- if self._panel:inside(self._mouse_x, self._mouse_y) then
-	for idx, box in pairs(self:profiles_panel()) do
-		local profile = self:profiles_panel()[idx]
-		if box:inside(self._mouse_x, self._mouse_y) and self._mouse_y > self._panel:y() and self._mouse_y < (self._panel:y() + self._panel:h()) then
-			self._mouse_inside = true
-			self._touch_profile = box:layer() == 0 and idx or box:layer()
-			self._touch_ui = idx
-			profile:child("top_line" .. idx):show()
-			profile:child("bottom_line" .. idx):show()
-			profile:child("left_line" .. idx):show()
-			profile:child("right_line" .. idx):show()
-			
-			if self._current_filter == 3 then
-				profile:child("remove_icon" .. idx):show()
-				profile:child("up_icon" .. idx):show()
-				profile:child("down_icon" .. idx):show()
-			end
-		else
-			profile:child("top_line" .. idx):hide()
-			profile:child("bottom_line" .. idx):hide()
-			profile:child("left_line" .. idx):hide()
-			profile:child("right_line" .. idx):hide()
-			profile:child("remove_icon" .. idx):hide()
-			profile:child("up_icon" .. idx):hide()
-			profile:child("down_icon" .. idx):hide()
-		end
-	end
-	-- end
-
-	-- deck list
-	if self._current_filter == 2 then
-
-		
-		if self.perk_display_mode_panel:child("arrow_left"):inside(x, y) or self.perk_display_mode_panel:child("arrow_right"):inside(x, y) then
-			self._mouse_inside = true
-		end
-	end
-	
 	-- #CustomProfile
 	
 	-- ##NewFilter
@@ -799,15 +742,6 @@ function ProfileReborn:mouse_moved(o, x, y)
 	else
 		managers.mouse_pointer:set_pointer_image("arrow")
 	end
-	
-	-- filter bg color
-	if self._filter:inside(x, y) then
-		self._filter_bg:set_color(self._filter_bg_color)
-		self._filter_bg:set_alpha(0.15)
-	else
-		self._filter_bg:set_color(Color.black)
-		self._filter_bg:set_alpha(1)
-	end
 end
 
 function ProfileReborn:mouse_pressed(o, button, x, y)
@@ -826,16 +760,9 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 		end
 	end
 
-	-- local ccf = self.custom.current_custom_filter
+	local ccf = self.custom.current_custom_filter
 
 	if button == Idstring("0") then
-		if self._current_filter == 2 then
-			if self.perk_display_mode_panel:child("arrow_left"):inside(x, y) then		
-				self:set_perks_display_mode(self.perk_deck.display_mode - 1)
-			elseif self.perk_display_mode_panel:child("arrow_right"):inside(x, y) then
-				self:set_perks_display_mode(self.perk_deck.display_mode + 1)
-			end
-		end
 		-- #CustomProfile
 		
 		if self._current_filter == 3 then
@@ -965,7 +892,7 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 						callback_func = function()
 							local max_filters = #self.custom.filters
 							table.remove(self.custom.filters, ccf)
-							
+
 							if ccf == max_filters then
 								ccf = ccf - 1
 							end
@@ -1010,7 +937,10 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 			--##SetCustom
 			for num, filter in ipairs(self.custom.filters) do
 				if filter.panel:inside(x, y) then
-					self.custom.filters[self.custom.current_custom_filter].panel:child("custom_filter_rect"):set_alpha(0)
+					if self.custom.filters[self.custom.current_custom_filter] then
+						self.custom.filters[self.custom.current_custom_filter].panel:child("custom_filter_rect"):set_alpha(0)
+					end
+
 					self.custom.filters[num].panel:child("custom_filter_rect"):set_alpha(0.75)
 					self:switch_custom(num)
 					break
@@ -1257,8 +1187,19 @@ function ProfileReborn:set_perk_desk_profile()
 	
 	local menu_arrows_texture = "guis/textures/menu_arrows"
 
-	local arrow_left = self.perk_display_mode_panel:bitmap({
+	self._controller_cls.set_perk_display_left = PRebornButton:new(self.perk_display_mode_panel, {
 		name = "arrow_left",
+		w = self.perk_display_mode_panel:h(),
+		h = self.perk_display_mode_panel:h(),
+		selection_mode = 2,
+		callback = function()
+			self:set_perks_display_mode(self.perk_deck.display_mode - 1)
+		end
+	})
+
+	local arrow_left_panel = self._controller_cls.set_perk_display_left:panel()
+
+	local arrow_left = arrow_left_panel:bitmap({
 		texture = menu_arrows_texture,
 		layer = 2,
 		texture_rect = {
@@ -1268,9 +1209,23 @@ function ProfileReborn:set_perk_desk_profile()
 			24
 		}
 	})
-	
-	local arrow_right = self.perk_display_mode_panel:bitmap({
+
+	arrow_left_panel:set_center_y(self.perk_display_mode_panel:h() / 2)
+	arrow_left:set_center_y(arrow_left_panel:h() / 2)
+
+	self._controller_cls.set_perk_display_right = PRebornButton:new(self.perk_display_mode_panel, {
 		name = "arrow_right",
+		w = self.perk_display_mode_panel:h(),
+		h = self.perk_display_mode_panel:h(),
+		selection_mode = 2,
+		callback = function()
+			self:set_perks_display_mode(self.perk_deck.display_mode + 1)
+		end
+	})
+
+	local arrow_right_panel = self._controller_cls.set_perk_display_right:panel()
+
+	local arrow_right = arrow_right_panel:bitmap({
 		texture = menu_arrows_texture,
 		layer = 2,
 		rotation = 180,
@@ -1281,7 +1236,12 @@ function ProfileReborn:set_perk_desk_profile()
 			24
 		}
 	})
-	
+
+	arrow_right_panel:set_right(self.perk_display_mode_panel:w())
+	arrow_right_panel:set_center_y(self.perk_display_mode_panel:h() / 2)
+	arrow_right:set_right(arrow_right_panel:w())
+	arrow_right:set_center_y(arrow_right_panel:h() / 2)
+
 	local display_mode_text = "menu_bp_perk_display_" .. self.perk_deck_display_method[self.perk_deck.display_mode]
 	self.perk_display_mode_text = self.perk_display_mode_panel:text({
 		name = "perk_display_mode_text",
@@ -1294,10 +1254,7 @@ function ProfileReborn:set_perk_desk_profile()
 		font_size = 18,
 		color = self._perk_deck_display_method_text_color
 	})
-		
-	arrow_left:set_center_y(self.perk_display_mode_panel:h() / 2)
-	arrow_right:set_center_y(self.perk_display_mode_panel:h() / 2)
-	arrow_right:set_right(self.perk_display_mode_panel:w())	
+
 	for key, cls in ipairs(self.perk_deck.panels) do
 		if self.perk_deck.display_mode ~= key then
 			cls:canvas():hide()
@@ -1360,7 +1317,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 		filters[base_filter].panel:child("custom_filter_rect"):set_alpha(0.75)
 		
 		for key, data in pairs(filters[base_filter].profiles) do
-			self:set_profile(key, data.profile, data.idx)
+			self:set_profile(key, data.profile, data.idx, true)
 		end
 	end
 
