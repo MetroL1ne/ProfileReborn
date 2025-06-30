@@ -3,12 +3,19 @@ PRebornButton = PRebornButton or class()
 
 function PRebornButton:init(panel, data)
 	self.class = "button"
+	data.alpha = data.selection_mode == 2 and (data.min_alpha or 0.5) or data.alpha
 	self._panel = panel:panel(data)
 	self._parent = panel
+	self._data = data
 
 	self._can_press = not (tostring(data.can_press) == "false") and true or false
-	self._bg = not (tostring(data.can_press) == "false") and data.selection_mode == 1 or false
 	self._selection_mode = data.selection_mode or 1
+
+	if self._selection_mode == 1 then
+		self._bg = not (tostring(data.bg) == "false") and true or false
+	else
+		self._bg = data.bg
+	end
 
 	local rect = self._panel:rect({
 		name = "rect",
@@ -16,8 +23,9 @@ function PRebornButton:init(panel, data)
 		w = self._panel:w(),
 		h = self._panel:h(),
 		layer = -1,
-		color = Color.black,
-		alpha = 0.7
+		color = data.bg_color or Color.black,
+		alpha = data.bg_alpha or 0.7,
+		layer = data.bg_layer
 	})
 
 	local text = self._panel:text({
@@ -99,18 +107,15 @@ function PRebornButton:set_callback(clbk)
 end
 
 function PRebornButton:mouse_moved(o, x, y)
-	if not self._can_press then
-		return false
-	end
+	local mouse_inside = self:inside(x, y)
 
-	local mouse_inside = false
 	if self._selection_mode == 1 or self._bg then
-		if self:inside(x, y) then
+		if mouse_inside then
 			if self._bg then
 				self._panel:child("rect"):set_visible(true)
 			end
 
-			if self._selection_mode == 1 then
+			if self._can_press and self._selection_mode == 1 then
 				mouse_inside = true
 			end
 		else
@@ -120,21 +125,25 @@ function PRebornButton:mouse_moved(o, x, y)
 		end
 	end
 
+	if not self._can_press then
+		return false
+	end
+
 	if self._selection_mode == 2 then
-		if self:inside(x, y) then
-			self._panel:set_alpha(1)
+		if mouse_inside then
+			self._panel:set_alpha(self._data.max_align or 1)
 		else
-			self._panel:set_alpha(0.5)
+			self._panel:set_alpha(self._data.min_alpha or 0.5)
 		end
 	elseif self._selection_mode == 3 then
-		if self:inside(x, y) then
-			self._panel:set_alpha(0.5)
+		if mouse_inside then
+			self._panel:set_alpha(self._data.min_alpha or 0.5)
 		else
-			self._panel:set_alpha(1)
+			self._panel:set_alpha(self._data.max_align or 1)
 		end
 	elseif self._selection_mode == 4 then
 		for _ , side_panel in pairs(self._side) do
-			if self:inside(x, y) then
+			if mouse_inside then
 				managers.mission._fading_debug_output:script().log(tostring(true), Color.white)
 				side_panel:set_visible(true)
 			else
@@ -143,7 +152,7 @@ function PRebornButton:mouse_moved(o, x, y)
 		end
 	elseif self._selection_mode == 5 then
 		for _ , line_panel in pairs(self._line) do
-			if self:inside(x, y) then
+			if mouse_inside then
 				line_panel:set_visible(true)
 			else
 				line_panel:set_visible(false)
