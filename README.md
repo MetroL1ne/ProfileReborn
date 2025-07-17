@@ -1,4 +1,13 @@
 # Change log
+**1.1**
+- Added a Search Box
+- Modify the style and position of the scroll bar, and enable drop scrolling
+- Reposition the Tool List in the Custom Filter
+- Reduce the transparency of the filter selector arrow and highlight it when selecting the arrow
+- Reduce the transparency of the Perk Deck display method selector arrow and highlight it when selecting the arrow
+- Deleted highlight of the filter selector panel
+- Modify the UI creation method
+
 **1.021**
 - Changed the position of the Perk Deck Filter display method option
 - Fixed mask related crashes
