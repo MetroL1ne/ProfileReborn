@@ -769,7 +769,9 @@ function ProfileReborn:key_press(o, k)
 	-- if self._selected then
 		-- return
 	-- end
-	
+
+	self._key_release_disable = false
+
 	local mouse_callbacks = managers.mouse_pointer._mouse_callbacks
 	if mouse_callbacks and mouse_callbacks[#mouse_callbacks] and mouse_callbacks[#mouse_callbacks].id ~= self._mouse_id then
 		self._key_release_disable = true
