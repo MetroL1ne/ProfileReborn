@@ -8,7 +8,7 @@ function PRebornButton:init(panel, data)
 	self._parent = panel
 	self._data = data
 
-	self._can_press = not (tostring(data.can_press) == "false") and true or false
+	self._active = not (tostring(data.active) == "false") and true or false
 	self._selection_mode = data.selection_mode or 1
 
 	if self._selection_mode == 1 then
@@ -22,7 +22,6 @@ function PRebornButton:init(panel, data)
 		visible = false,
 		w = self._panel:w(),
 		h = self._panel:h(),
-		layer = -1,
 		color = data.bg_color or Color.black,
 		alpha = data.bg_alpha or 0.7,
 		layer = data.bg_layer
@@ -106,6 +105,14 @@ function PRebornButton:set_callback(clbk)
 	self._callback = clbk
 end
 
+function PRebornButton:set_active(state)
+	self._active = state
+end
+
+function PRebornButton:active()
+	return self._active
+end
+
 function PRebornButton:mouse_moved(o, x, y)
 	local mouse_inside = self:inside(x, y)
 
@@ -115,7 +122,7 @@ function PRebornButton:mouse_moved(o, x, y)
 				self._panel:child("rect"):set_visible(true)
 			end
 
-			if self._can_press and self._selection_mode == 1 then
+			if self._active and self._selection_mode == 1 then
 				mouse_inside = true
 			end
 		else
@@ -125,7 +132,7 @@ function PRebornButton:mouse_moved(o, x, y)
 		end
 	end
 
-	if not self._can_press then
+	if not self._active then
 		return false
 	end
 
@@ -164,6 +171,10 @@ function PRebornButton:mouse_moved(o, x, y)
 end
 
 function PRebornButton:mouse_pressed(button, x, y)
+	if not self._active then
+		return false
+	end
+	
 	if button == Idstring("0") then
 		if self:inside(x, y) then
 			if self:callback() then
@@ -783,6 +794,14 @@ end
 
 function PRebornScrollListSimple:panel()
 	return self._panel
+end
+
+function PRebornScrollListSimple:parent()
+	return self._parent
+end
+
+function PRebornScrollListSimple:destroy()
+	self:parent():remove(self._panel)
 end
 
 function PRebornScrollListSimple:canvas()
