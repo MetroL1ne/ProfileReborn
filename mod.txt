@@ -1,8 +1,8 @@
 {
 	"name" : "Profile Reborn",
 	"description" : "",
-	"author" : "MetroLine",   
-	"version" : "1.021.4",
+	"author" : "MetroLine",
+	"version" : "1.021.5",
 	"blt_version": 2,
 	"hooks" : [
 		{
@@ -27,3 +27,4 @@
 		}
 	]
 }
+
