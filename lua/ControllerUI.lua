@@ -45,10 +45,10 @@ function PRebornButton:init(panel, data)
 	if data.selection_mode == 4 then
 		self._side = {}
 
-		self._side[1] = BoxGuiObject:_create_side(self._panel, "left", 1, false, false)
-		self._side[2] = BoxGuiObject:_create_side(self._panel, "right", 1, false, false)
-		self._side[3] = BoxGuiObject:_create_side(self._panel, "top", 1, false, false)
-		self._side[4] = BoxGuiObject:_create_side(self._panel, "bottom", 1, false, false)
+		self._side[1] = PRebornBoxGuiObject:_create_side(self._panel, "left", 1, false, false)
+		self._side[2] = PRebornBoxGuiObject:_create_side(self._panel, "right", 1, false, false)
+		self._side[3] = PRebornBoxGuiObject:_create_side(self._panel, "top", 1, false, false)
+		self._side[4] = PRebornBoxGuiObject:_create_side(self._panel, "bottom", 1, false, false)
 	elseif data.selection_mode == 5 then
 		self._line = {}
 
@@ -151,7 +151,6 @@ function PRebornButton:mouse_moved(o, x, y)
 	elseif self._selection_mode == 4 then
 		for _ , side_panel in pairs(self._side) do
 			if mouse_inside then
-				managers.mission._fading_debug_output:script().log(tostring(true), Color.white)
 				side_panel:set_visible(true)
 			else
 				side_panel:set_visible(false)
@@ -690,6 +689,7 @@ function PRebornScrollList:init(panel, data, canvas_config, ...)
 	self.class = "list"
 	self._panel = self._panel
 	self._parent = panel
+	self._data = data
 	self._h = data.h or panel:h() / 2
 	self._dy = data.dy or 1
 
@@ -716,6 +716,28 @@ function PRebornScrollList:init(panel, data, canvas_config, ...)
 	title:set_top(self:canvas():top())
 
 	self._callback = data.callback
+
+	-- Style Change
+
+	local scroll_bar = self._scroll:panel():child("scroll_bar")
+	local scroll_bar_BoxGuiObject0 = scroll_bar:child("BoxGuiObject0")
+
+	for k, panel in ipairs(scroll_bar_BoxGuiObject0:children()) do
+		panel:set_visible(false)
+	end
+
+	local canvas_bg = scroll_bar_BoxGuiObject0:rect({
+		color = data.main_color,
+		alpha = 1,
+		w = scroll_bar_BoxGuiObject0:w(),
+		h = scroll_bar_BoxGuiObject0:h()
+	})
+
+	self:panel():set_w(self:canvas():w() + scroll_bar:w() + 3)
+
+	scroll_bar:set_left(self:canvas():right())
+	self._scroll:panel():child("scroll_up_indicator_arrow"):set_center_x(scroll_bar:center_x())
+	self._scroll:panel():child("scroll_down_indicator_arrow"):set_center_x(scroll_bar:center_x())
 end
 
 function PRebornScrollList:panel()
@@ -766,6 +788,51 @@ function PRebornScrollList:mouse_wheel_down(x, y)
 	end
 
 	return PRebornScrollList.super.super.super.mouse_wheel_down(self, x, y)
+end
+
+function PRebornScrollList:add_lines_and_static_down_indicator(layer)
+	local box = PRebornBoxGuiObject:new(self:scroll_item():scroll_panel(), {
+		w = self:canvas():w(),
+		sides = {
+			1,
+			1,
+			2,
+			0
+		},
+		layer = layer,
+		color = self._data.main_color
+	})
+	local down_no_scroll = PRebornBoxGuiObject:new(box._panel, {
+		sides = {
+			0,
+			0,
+			0,
+			1
+		},
+		layer = layer,
+		color = self._data.main_color
+	})
+	local down_scroll = PRebornBoxGuiObject:new(box._panel, {
+		sides = {
+			0,
+			0,
+			0,
+			2
+		},
+		layer = layer,
+		color = self._data.main_color
+	})
+
+	local function update_down_indicator()
+		local indicate = self:scroll_item()._scroll_bar:visible()
+
+		down_no_scroll:set_visible(not indicate)
+		down_scroll:set_visible(indicate)
+	end
+
+	update_down_indicator()
+
+	self._scroll.on_canvas_resized = update_down_indicator
 end
 
 PRebornScrollListSimple = PRebornScrollListSimple or class()
@@ -977,4 +1044,142 @@ function PRebornScrollListSimple:mouse_wheel_down(x, y)
 end
 
 function PRebornScrollListSimple:mouse_released(button, x, y)
+end
+
+PRebornSearchBox = PRebornSearchBox or class(SearchBoxGuiObject)
+
+PRebornBoxGuiObject = PRebornBoxGuiObject or class(BoxGuiObject)
+
+function PRebornBoxGuiObject:_create_side(panel, side, type, texture, one_two_align)
+	local mvector_tl = Vector3()
+	local mvector_tr = Vector3()
+	local mvector_bl = Vector3()
+	local mvector_br = Vector3()
+
+	local ids_side = Idstring(side)
+	local ids_left = Idstring("left")
+	local ids_right = Idstring("right")
+	local ids_top = Idstring("top")
+	local ids_bottom = Idstring("bottom")
+	local left_or_right = false
+	local w, h = nil
+
+	if ids_side == ids_left or ids_side == ids_right then
+		left_or_right = true
+		w = 2
+		h = panel:h()
+	else
+		w = panel:w()
+		h = 2
+	end
+
+	local side_panel = panel:panel({
+		name = side,
+		w = w,
+		h = h,
+		halign = left_or_right and side or "scale",
+		valign = left_or_right and "scale" or side
+	})
+
+	if type == 0 then
+		return
+	elseif type == 1 or type == 3 or type == 4 then
+		local one = side_panel:rect({
+			wrap_mode = "wrap",
+			color = self._color
+		})
+		local two = side_panel:rect({
+			wrap_mode = "wrap",
+			color = self._color
+		})
+		local x = math.random(1, 255)
+		local y = 1
+		local tw = math.min(10, w)
+		local th = math.min(10, h)
+
+		if left_or_right then
+			one:set_halign(side)
+			two:set_halign(side)
+			one:set_valign(one_two_align and "top" or "scale")
+			two:set_valign(one_two_align and "bottom" or "scale")
+			mvector3.set_static(mvector_tl, x, y + tw, 0)
+			mvector3.set_static(mvector_tr, x, y, 0)
+			mvector3.set_static(mvector_bl, x + th, y + tw, 0)
+			mvector3.set_static(mvector_br, x + th, y, 0)
+
+			x = math.random(1, 255)
+			y = 1
+
+			mvector3.set_static(mvector_tl, x, y + tw, 0)
+			mvector3.set_static(mvector_tr, x, y, 0)
+			mvector3.set_static(mvector_bl, x + th, y + tw, 0)
+			mvector3.set_static(mvector_br, x + th, y, 0)
+			one:set_size(2, th)
+			two:set_size(2, th)
+			two:set_bottom(h)
+		else
+			one:set_halign(one_two_align and "left" or "scale")
+			two:set_halign(one_two_align and "right" or "scale")
+			one:set_valign(side)
+			two:set_valign(side)
+			mvector3.set_static(mvector_tl, x, y, 0)
+			mvector3.set_static(mvector_tr, x + tw, y, 0)
+			mvector3.set_static(mvector_bl, x, y + th, 0)
+			mvector3.set_static(mvector_br, x + tw, y + th, 0)
+
+			x = math.random(1, 255)
+			y = 1
+
+			mvector3.set_static(mvector_tl, x, y, 0)
+			mvector3.set_static(mvector_tr, x + tw, y, 0)
+			mvector3.set_static(mvector_bl, x, y + th, 0)
+			mvector3.set_static(mvector_br, x + tw, y + th, 0)
+			one:set_size(tw, 2)
+			two:set_size(tw, 2)
+			two:set_right(w)
+		end
+
+		one:set_visible(type == 1 or type == 3)
+		two:set_visible(type == 1 or type == 4)
+	elseif type == 2 then
+		local full = side_panel:rect({
+			wrap_mode = "wrap",
+			w = side_panel:w(),
+			h = side_panel:h(),
+			color = self._color
+		})
+		local x = math.random(1, 255)
+		local y = 1
+
+		if left_or_right then
+			full:set_halign(side)
+			full:set_valign("scale")
+			mvector3.set_static(mvector_tl, x, y + w, 0)
+			mvector3.set_static(mvector_tr, x, y, 0)
+			mvector3.set_static(mvector_bl, x + h, y + w, 0)
+			mvector3.set_static(mvector_br, x + h, y, 0)
+		else
+			full:set_halign("scale")
+			full:set_valign(side)
+			mvector3.set_static(mvector_tl, x, y, 0)
+			mvector3.set_static(mvector_tr, x + w, y, 0)
+			mvector3.set_static(mvector_bl, x, y + h, 0)
+			mvector3.set_static(mvector_br, x + w, y + h, 0)
+		end
+	else
+		Application:error("[PRebornBoxGuiObject] Type", type, "is not supported")
+		Application:stack_dump()
+
+		return
+	end
+
+	side_panel:set_position(0, 0)
+
+	if ids_side == ids_right then
+		side_panel:set_right(panel:w())
+	elseif ids_side == ids_bottom then
+		side_panel:set_bottom(panel:h())
+	end
+
+	return side_panel
 end
