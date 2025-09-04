@@ -1,6 +1,7 @@
 # Change log
 **1.1**
 - Added a Search Box
+- Added lines and static down indicator
 - Modify the style and position of the scroll bar, and enable drop scrolling
 - Reposition the Tool List in the Custom Filter
 - Reduce the transparency of the filter selector arrow and highlight it when selecting the arrow
