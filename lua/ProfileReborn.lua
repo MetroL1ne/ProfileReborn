@@ -68,12 +68,13 @@ function ProfileReborn:active()
 		h = 500,
 		input_focus = true,
 		layer = self._ui_layer,
-		dy = self._wheel_scroll_value
+		dy = self._wheel_scroll_value,
+		main_color = self._main_color
 	}, {
 		padding = 0
 	})
 
-	self._controller_cls.profile_list:add_lines_and_static_down_indicator()
+	self._controller_cls.profile_list:add_lines_and_static_down_indicator(5000)
 
 	self._panel = self._controller_cls.profile_list:panel()
 	self._canvas = self._controller_cls.profile_list:canvas()
@@ -222,7 +223,7 @@ function ProfileReborn:active()
 	self._panel:key_press(callback(self, self, "key_press"))
 	self._panel:key_release(callback(self, self, "key_release"))
 
-	if SearchBoxGuiObject and managers.menu:is_pc_controller() then
+	if PRebornSearchBox and managers.menu:is_pc_controller() then
 		local scbox = self._ws:panel():panel({
 			layer = self._ui_layer,
 			w = self._canvas:w(),
@@ -234,7 +235,7 @@ function ProfileReborn:active()
 
 		self._saved_search = nil
 
-		self._profile_searchbox = SearchBoxGuiObject:new(scbox, self._ws, self._saved_search)
+		self._profile_searchbox = PRebornSearchBox:new(scbox, self._ws, self._saved_search)
 		self._profile_searchbox.panel:set_right(scbox:w())
 		self._profile_searchbox.panel:set_top(1)
 		self._profile_searchbox:register_callback(callback(self, self, "update_items_list", false))
