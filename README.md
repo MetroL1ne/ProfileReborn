@@ -1,4 +1,9 @@
 # Change log
+**1.101**
+- Fixed the pointing issue of the tool list
+- Fixed rename button did not work after switch custom filter
+- Fixed the issue of not automatically switching after creating a new custom filter
+  
 **1.1**
 - Added a Search Box
 - Added lines and static down indicator
