@@ -1085,7 +1085,7 @@ end
 function ProfileReborn:set_custom_profile(base_filter)
 	self.custom = {}
 	self.custom.filters = {}
-	self.custom.panel = self._canvas:panel({})
+	self.custom.panel = self._panel:panel({})
 	
 	local base_filter = base_filter or (self.save_data and self.save_data.current_custom_filter) or 1
 	
@@ -1343,6 +1343,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 		h = tool_list:canvas():w() * 1,
 		selection_mode = 2,
 		callback = function()
+			local ccf = self.custom.current_custom_filter
+
 			if #self.custom.filters > 0 then
 				if ccf > 1 then
 					self:swap_filter(ccf, ccf - 1)
@@ -1374,6 +1376,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 		h = tool_list:canvas():w() * 1,
 		selection_mode = 2,
 		callback = function()
+			local ccf = self.custom.current_custom_filter
+
 			if #self.custom.filters > 0 then
 				if ccf < #self.custom.filters then
 					self:swap_filter(ccf, ccf + 1)
@@ -1419,6 +1423,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 			local yes_button = {
 				text = managers.localization:text("dialog_yes"),
 				callback_func = function()
+					local ccf = self.custom.current_custom_filter
+					
 					local max_filters = #self.custom.filters
 					table.remove(self.custom.filters, ccf)
 
@@ -1468,68 +1474,70 @@ function ProfileReborn:set_custom_profile(base_filter)
 	tool_list:add_item(tool_icon_remove_filter)
 
 	-- Custom Filter - Input Panel
-	self._input_panel = self.custom.panel:panel({
-		visible = false,
-		layer = self._ui_layer + 1,
-		w = 300,
-		h = 120
-	})
-	
-	self._input_panel:set_center(self.custom.panel:center_x(), self.custom.panel:center_y())
-	
-	self._name_label = self._input_panel:rect({
-		vertical = "center",
-		align = "center",
-		color = Color("3370ff"),
-		layer = 2,
-		w = self._input_panel:w(),
-		h = 30
-	})
-	
-	self._name_top_text = self._input_panel:text({
-		vertical = "center",
-		align = "left",
-		text = string.upper(managers.localization:text("menu_bp_enter_custom_name")),
-		layer = 4,
-		font = tweak_data.menu.pd2_small_font,
-		font_size = 21,
-		color = Color.white,
-		x = 10
-	})
-	
-	self._name_top_text:set_center_y(self._name_label:h() / 2)
-	
-	self._name_rect = self._input_panel:rect({
-		vertical = "center",
-		align = "center",
-		color = Color.black,
-		layer = 1,
-		alpha = 1,
-		w = self._canvas:w(),
-		h = self._canvas:h()
-	})
-	
-	self._name_text = self._input_panel:text({
-		vertical = "center",
-		align = "center",
-		text = "",
-		layer = 4,
-		font = tweak_data.menu.pd2_small_font,
-		font_size = tweak_data.menu.pd2_medium_font_size,
-		color = Color.white -- tweak_data.screen_colors.button_stage_3
-	})
+	if not alive(self._input_panel) then
+		self._input_panel = self.custom.panel:panel({
+			visible = false,
+			layer = self._ui_layer + 1,
+			w = 300,
+			h = 120
+		})
+		
+		self._input_panel:set_center(self.custom.panel:center_x(), self.custom.panel:center_y())
+		
+		self._name_label = self._input_panel:rect({
+			vertical = "center",
+			align = "center",
+			color = Color("3370ff"),
+			layer = 2,
+			w = self._input_panel:w(),
+			h = 30
+		})
+		
+		self._name_top_text = self._input_panel:text({
+			vertical = "center",
+			align = "left",
+			text = string.upper(managers.localization:text("menu_bp_enter_custom_name")),
+			layer = 4,
+			font = tweak_data.menu.pd2_small_font,
+			font_size = 21,
+			color = Color.white,
+			x = 10
+		})
+		
+		self._name_top_text:set_center_y(self._name_label:h() / 2)
+		
+		self._name_rect = self._input_panel:rect({
+			vertical = "center",
+			align = "center",
+			color = Color.black,
+			layer = 1,
+			alpha = 1,
+			w = self._canvas:w(),
+			h = self._canvas:h()
+		})
+		
+		self._name_text = self._input_panel:text({
+			vertical = "center",
+			align = "center",
+			text = "",
+			layer = 4,
+			font = tweak_data.menu.pd2_small_font,
+			font_size = tweak_data.menu.pd2_medium_font_size,
+			color = Color.white -- tweak_data.screen_colors.button_stage_3
+		})
 
-	self._name_input_rect = self._input_panel:rect({
-		vertical = "center",
-		align = "center",
-		color = Color("3370ff"),
-		layer = 5,
-		alpha = 1,
-		w = self._input_panel:w(),
-		h = 100
-	})
-	
-	self._name_input_rect:set_center(self._input_panel:center_x(),self._input_panel:center_y())
+		self._name_input_rect = self._input_panel:rect({
+			vertical = "center",
+			align = "center",
+			color = Color("3370ff"),
+			layer = 5,
+			alpha = 1,
+			w = self._input_panel:w(),
+			h = 100
+		})
+		
+		self._name_input_rect:set_center(self._input_panel:center_x(),self._input_panel:center_y())
+	end
 end
 
 function ProfileReborn:set_perks_display_mode(mode)
@@ -1581,7 +1589,7 @@ function ProfileReborn:create_new_filter(name)
 	
 	self.custom.current_custom_filter = #filters
 
-	-- self:switch_filter(3, key)
+	self:switch_filter(3, key)
 end
 
 function ProfileReborn:create_filter_ui(scroll, name, key)
