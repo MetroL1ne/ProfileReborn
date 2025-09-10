@@ -1343,6 +1343,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 		h = tool_list:canvas():w() * 1,
 		selection_mode = 2,
 		callback = function()
+			local ccf = self.custom.current_custom_filter
+
 			if #self.custom.filters > 0 then
 				if ccf > 1 then
 					self:swap_filter(ccf, ccf - 1)
@@ -1374,6 +1376,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 		h = tool_list:canvas():w() * 1,
 		selection_mode = 2,
 		callback = function()
+			local ccf = self.custom.current_custom_filter
+
 			if #self.custom.filters > 0 then
 				if ccf < #self.custom.filters then
 					self:swap_filter(ccf, ccf + 1)
@@ -1419,6 +1423,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 			local yes_button = {
 				text = managers.localization:text("dialog_yes"),
 				callback_func = function()
+					local ccf = self.custom.current_custom_filter
+					
 					local max_filters = #self.custom.filters
 					table.remove(self.custom.filters, ccf)
 
