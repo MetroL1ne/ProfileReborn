@@ -720,7 +720,7 @@ function PRebornScrollList:init(panel, data, canvas_config, ...)
 	-- Style Change
 
 	local scroll_bar = self._scroll:panel():child("scroll_bar")
-	local scroll_bar_BoxGuiObject0 = scroll_bar:child("BoxGuiObject0")
+	local scroll_bar_BoxGuiObject0 = scroll_bar:child("scroll_bar_inside_panel")
 
 	for k, panel in ipairs(scroll_bar_BoxGuiObject0:children()) do
 		panel:set_visible(false)
@@ -1183,3 +1183,4 @@ function PRebornBoxGuiObject:_create_side(panel, side, type, texture, one_two_al
 
 	return side_panel
 end
+
