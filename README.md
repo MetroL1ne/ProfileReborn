@@ -1,6 +1,6 @@
 # Change log
 **1.102**
-- Fixed the crash issue (For PAYDAY 2 Update 242)
+- Fixed the crash caused by PAYDAY 2 Update 242
 
 **1.101**
 - Fixed the pointing issue of the tool list
