@@ -722,6 +722,14 @@ function PRebornScrollList:init(panel, data, canvas_config, ...)
 	local scroll_bar = self._scroll:panel():child("scroll_bar")
 	local scroll_bar_BoxGuiObject0 = scroll_bar:child("scroll_bar_inside_panel")
 
+	if not scroll_bar_BoxGuiObject0 then
+		scroll_bar_BoxGuiObject0 = scroll_bar:child("BoxGuiObject0")
+	end
+
+	if not scroll_bar_BoxGuiObject0 then
+		return
+	end
+
 	for k, panel in ipairs(scroll_bar_BoxGuiObject0:children()) do
 		panel:set_visible(false)
 	end
@@ -1183,4 +1191,5 @@ function PRebornBoxGuiObject:_create_side(panel, side, type, texture, one_two_al
 
 	return side_panel
 end
+
 
