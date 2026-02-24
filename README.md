@@ -1,4 +1,11 @@
 # Change log
+**1.11**
+- Adapted to the latest game version (u243)
+- Added support for controllers
+- Added reorder buttons for sorting your builds
+- Adjusted the position of skill display
+- Fixed hit detection issues with the profile button
+
 **1.102**
 - Fixed the crash caused by PAYDAY 2 Update 242
 
