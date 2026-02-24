@@ -19,24 +19,24 @@ function PRebornButton:init(panel, data)
 
 	local rect = self._panel:rect({
 		name = "rect",
-		visible = false,
+		visible = (self._selection_mode == 1 and not self._active) and self._bg,
 		w = self._panel:w(),
 		h = self._panel:h(),
 		color = data.bg_color or Color.black,
 		alpha = data.bg_alpha or 0.7,
-		layer = data.bg_layer
+		layer = (data.bg_layer and data.bg_layer or 1) - (self._active and 0 or 2)
 	})
 
 	local text = self._panel:text({
 		name = "text",
 		color = data.text_color or Color.white,
-		vertical = "center",
-		valign = "left",
-		align = "left",
-		halign = "center",
+		vertical = data.text_vertical or "center",
+		valign = data.text_valign or "left",
+		align = data.text_align or "left",
+		halign = data.text_halign or "center",
 		font = tweak_data.hud_players.ammo_font,
 		text = data.text,
-		font_size = data.font_size and size.font_size or 20
+		font_size = data.font_size or 20
 	})
 
 	text:set_left(self._panel:left())
@@ -83,6 +83,7 @@ function PRebornButton:init(panel, data)
 	end
 
 	self._callback = data.callback
+	self._right_callback = data.right_callback
 end
 
 function PRebornButton:panel()
@@ -105,6 +106,15 @@ function PRebornButton:set_callback(clbk)
 	self._callback = clbk
 end
 
+
+function PRebornButton:right_callback()
+	return self._right_callback
+end
+
+function PRebornButton:set_right_callback(clbk)
+	self._right_callback = clbk
+end
+
 function PRebornButton:set_active(state)
 	self._active = state
 end
@@ -115,6 +125,10 @@ end
 
 function PRebornButton:mouse_moved(o, x, y)
 	local mouse_inside = self:inside(x, y)
+
+	if not self._panel:visible() or not self._active then
+		return false
+	end
 
 	if self._selection_mode == 1 or self._bg then
 		if mouse_inside then
@@ -130,10 +144,6 @@ function PRebornButton:mouse_moved(o, x, y)
 				self._panel:child("rect"):set_visible(false)
 			end
 		end
-	end
-
-	if not self._active then
-		return false
 	end
 
 	if self._selection_mode == 2 then
@@ -174,10 +184,16 @@ function PRebornButton:mouse_pressed(button, x, y)
 		return false
 	end
 	
-	if button == Idstring("0") then
-		if self:inside(x, y) then
+	if self:inside(x, y) then
+		if button == Idstring("0") then
 			if self:callback() then
 				self:callback()()
+			end
+		elseif button == Idstring("1") then
+			if self:right_callback() then
+				self:right_callback()()
+
+				return true
 			end
 		end
 	end
@@ -195,9 +211,9 @@ function PRebornButton:inside(x, y)
 end
 
 -- 切换按钮Lib
-PRebornToggleButton = PRebornToggleButton or class()
+PRebornToggle = PRebornToggle or class()
 
-function PRebornToggleButton:init(panel, data)
+function PRebornToggle:init(panel, data)
 	self.class = "toggle"
 	self._parent = panel
 	self._state = data.state or false
@@ -240,7 +256,7 @@ function PRebornToggleButton:init(panel, data)
 		halign = "center",
 		font = tweak_data.hud_players.ammo_font,
 		text = data.text,
-		font_size = data.font_size and size.font_size or 20
+		font_size = data.font_size or 20
 	})
 
 	tickbox_text:set_left(self._panel:left())
@@ -249,27 +265,27 @@ function PRebornToggleButton:init(panel, data)
 	self._callback = data.callback
 end
 
-function PRebornToggleButton:panel()
+function PRebornToggle:panel()
 	return self._panel
 end
 
-function PRebornToggleButton:parent()
+function PRebornToggle:parent()
 	return self._parent
 end
 
-function PRebornToggleButton:destroy()
+function PRebornToggle:destroy()
 	self:parent():remove(self._panel)
 end
 
-function PRebornToggleButton:callback()
+function PRebornToggle:callback()
 	return self._callback
 end
 
-function PRebornToggleButton:set_callback(clbk)
+function PRebornToggle:set_callback(clbk)
 	self._callback = clbk
 end
 
-function PRebornToggleButton:mouse_moved(o, x, y)
+function PRebornToggle:mouse_moved(o, x, y)
 	local mouse_inside = false
 
 	if self:inside(x, y) then
@@ -282,7 +298,7 @@ function PRebornToggleButton:mouse_moved(o, x, y)
 	return mouse_inside
 end
 
-function PRebornToggleButton:mouse_pressed(button, x, y)
+function PRebornToggle:mouse_pressed(button, x, y)
 	if button == Idstring("0") then
 		if self:inside(x, y) then
 			if self:callback() then
@@ -292,10 +308,10 @@ function PRebornToggleButton:mouse_pressed(button, x, y)
 	end
 end
 
-function PRebornToggleButton:mouse_released(button, x, y)
+function PRebornToggle:mouse_released(button, x, y)
 end
 
-function PRebornToggleButton:inside(x, y)
+function PRebornToggle:inside(x, y)
 	if self._panel:inside(x, y) then
 		return true, "link"
 	end
@@ -303,14 +319,14 @@ function PRebornToggleButton:inside(x, y)
 	return false, "arrow"
 end
 
-function PRebornToggleButton:toggle()
+function PRebornToggle:toggle()
 	local new_state = not self._state
 	self:set_state(new_state)
 
 	return new_state
 end
 
-function PRebornToggleButton:set_state(state)
+function PRebornToggle:set_state(state)
 	self._state = state
 	local box = self._panel:child("tickbox_toggle")
 
@@ -325,7 +341,7 @@ end
 -- 输入框Lib
 PRebornInputBox = PRebornInputBox or class()
 
-function PRebornInputBox:init(panel, ws, data)
+function PRebornInputBox:init(panel, data, ws)
 	self.class = "input"
 	self._ws = ws
 	self._parent = panel
@@ -343,7 +359,7 @@ function PRebornInputBox:init(panel, ws, data)
 		text = data.text,
 		alpha = 0.7,
 		font = data.font or tweak_data.hud_players.ammo_font,
-		font_size = data.font_size and size.font_size or 20,
+		font_size = data.font_size or 20,
 		color = data.text_color
 	})
 
@@ -358,7 +374,7 @@ function PRebornInputBox:init(panel, ws, data)
 		halign = "center",
 		text = data.value,
 		font = data.font or tweak_data.hud_players.ammo_font,
-		font_size = data.font_size and size.font_size or 20,
+		font_size = data.font_size or 20,
 		color = data.input_text_color
 	})
 
@@ -386,7 +402,9 @@ function PRebornInputBox:init(panel, ws, data)
 		color = Color(1, 1, 1, 1)
 	})
 
-	self._callback = data.callback
+	self._click_callback = data.click_callback
+	self._enter_callback = data.enter_callback
+	self._clickout_callback = data.clickout_callback
 end
 
 function PRebornInputBox:panel()
@@ -681,12 +699,12 @@ function PRebornInputBox:handle_key(k, pressed)
 	self:update_caret()
 end
 
-PRebornScrollList = PRebornScrollList or class(ScrollItemList)
+PRebornVerticalScrollItemList = PRebornVerticalScrollItemList or class(ScrollItemList)
 
-function PRebornScrollList:init(panel, data, canvas_config, ...)
-	PRebornScrollList.super.init(self, panel, data, canvas_config, ...)
+function PRebornVerticalScrollItemList:init(panel, data, canvas_config, ...)
+	PRebornVerticalScrollItemList.super.init(self, panel, data, canvas_config, ...)
 	
-	self.class = "list"
+	self.class = "vertical_list"
 	self._panel = self._panel
 	self._parent = panel
 	self._data = data
@@ -714,8 +732,6 @@ function PRebornScrollList:init(panel, data, canvas_config, ...)
 
 	title:set_right(self:canvas():w())
 	title:set_top(self:canvas():top())
-
-	self._callback = data.callback
 
 	-- Style Change
 
@@ -746,21 +762,61 @@ function PRebornScrollList:init(panel, data, canvas_config, ...)
 	scroll_bar:set_left(self:canvas():right())
 	self._scroll:panel():child("scroll_up_indicator_arrow"):set_center_x(scroll_bar:center_x())
 	self._scroll:panel():child("scroll_down_indicator_arrow"):set_center_x(scroll_bar:center_x())
+
+	-- local widget_panel = nil
+
+	-- self._child_classes = {}
+	-- for _, widget in ipairs(data.widgets or {}) do
+	-- 	if widget.type then
+	-- 		local widget_class = rawget(_G, widget.type):new(self:canvas(), widget, unpack(widget.params or {}))
+	-- 		widget_panel = widget_class:panel()
+	-- 		self._child_classes[#self._child_classes + 1] = widget_class
+	-- 	else
+	-- 		widget_panel = self:canvas():panel(widget)
+	-- 	end
+
+	-- 	widget_panel:set_w(widget.w or self:canvas():w())
+	-- 	widget_panel:set_h(widget.h or self:canvas():h())
+
+	-- 	self:add_item(widget_panel)
+	-- end
 end
 
-function PRebornScrollList:panel()
+function PRebornVerticalScrollItemList:panel()
 	return self._panel
 end
 
-function PRebornScrollList:parent()
+function PRebornVerticalScrollItemList:parent()
 	return self._parent
 end
 
-function PRebornScrollList:destroy()
+function PRebornVerticalScrollItemList:destroy()
 	self:parent():remove(self._panel)
 end
 
-function PRebornScrollList:mouse_pressed(button, x, y)
+-- function PRebornVerticalScrollItemList:mouse_moved(o, x, y)
+-- 	if not self._panel:visible() then
+-- 		return false
+-- 	end
+
+-- 	local mouse_inside = PRebornVerticalScrollItemList.super.mouse_moved(o, x, y)
+
+-- 	for _, class in ipairs(self._child_classes) do
+-- 		mouse_inside = class:mouse_moved(o, x, y) or mouse_inside
+-- 	end
+
+-- 	return mouse_inside
+-- end
+
+function PRebornVerticalScrollItemList:mouse_pressed(button, x, y)
+	if not self._panel:visible() then
+		return
+	end
+
+	-- for _, class in ipairs(self._child_classes) do
+	-- 	class:mouse_pressed(button, x, y)
+	-- end
+
 	if button == Idstring("mouse wheel up") then
 		return self:mouse_wheel_up(x, y)
 	elseif button == Idstring("mouse wheel down") then
@@ -770,7 +826,7 @@ function PRebornScrollList:mouse_pressed(button, x, y)
 	self.super.mouse_pressed(self, button, x, y)
 end
 
-function PRebornScrollList:mouse_wheel_up(x, y)
+function PRebornVerticalScrollItemList:mouse_wheel_up(x, y)
 	if not alive(self._scroll) then
 		return
 	end
@@ -781,10 +837,10 @@ function PRebornScrollList:mouse_wheel_up(x, y)
 		return
 	end
 
-	return PRebornScrollList.super.super.super.mouse_wheel_up(self, x, y)
+	return PRebornVerticalScrollItemList.super.super.super.mouse_wheel_up(self, x, y)
 end
 
-function PRebornScrollList:mouse_wheel_down(x, y)
+function PRebornVerticalScrollItemList:mouse_wheel_down(x, y)
 	if not alive(self._scroll) then
 		return
 	end
@@ -795,10 +851,10 @@ function PRebornScrollList:mouse_wheel_down(x, y)
 		return
 	end
 
-	return PRebornScrollList.super.super.super.mouse_wheel_down(self, x, y)
+	return PRebornVerticalScrollItemList.super.super.super.mouse_wheel_down(self, x, y)
 end
 
-function PRebornScrollList:add_lines_and_static_down_indicator(layer)
+function PRebornVerticalScrollItemList:add_lines_and_static_down_indicator(layer)
 	local box = PRebornBoxGuiObject:new(self:scroll_item():scroll_panel(), {
 		w = self:canvas():w(),
 		sides = {
@@ -843,9 +899,184 @@ function PRebornScrollList:add_lines_and_static_down_indicator(layer)
 	self._scroll.on_canvas_resized = update_down_indicator
 end
 
-PRebornScrollListSimple = PRebornScrollListSimple or class()
+function PRebornVerticalScrollItemList:swap_item_by_index(item_1, item_2)
+	local item_1_x, item_1_y = self._current_items[item_1]:position()
+	self._current_items[item_1]:set_position(self._current_items[item_2]:position())
+	self._current_items[item_2]:set_position(item_1_x, item_1_y)
 
-function PRebornScrollListSimple:init(panel, data)
+	self._current_items[item_1], self._current_items[item_2] = self._current_items[item_2], self._current_items[item_1]
+end
+
+PRebornHorizontalScrollItemList = PRebornHorizontalScrollItemList or class(HorizontalScrollItemList)
+
+function PRebornHorizontalScrollItemList:init(panel, data, canvas_config, ...)
+	PRebornVerticalScrollItemList.super.init(self, panel, data, canvas_config, ...)
+	
+	self.class = "horizontal_list"
+	self._panel = self._panel
+	self._parent = panel
+	self._data = data
+	self._h = data.h or panel:h() / 2
+	self._dy = data.dy or 1
+
+	if data.items then
+		for _, item in ipairs(data.items) do
+			self:add_item(item)
+		end
+	end
+
+	-- local title = self:canvas():text({
+	-- 	name = "title",
+	-- 	color = Color.white,
+	-- 	vertical = "top",
+	-- 	valign = "right",
+	-- 	align = "right",
+	-- 	halign = "top",
+	-- 	font = tweak_data.hud_players.ammo_font,
+	-- 	text = data.title or "",
+	-- 	alpha = 0.6,
+	-- 	font_size = data.title_font_size or 50
+	-- })
+
+	-- title:set_right(self:canvas():w())
+	-- title:set_top(self:canvas():top())
+
+	-- Style Change
+
+	-- local scroll_bar = self._scroll:panel():child("scroll_bar")
+	-- local scroll_bar_BoxGuiObject0 = scroll_bar:child("scroll_bar_inside_panel")
+
+	-- if not scroll_bar_BoxGuiObject0 then
+	-- 	scroll_bar_BoxGuiObject0 = scroll_bar:child("BoxGuiObject0")
+	-- end
+
+	-- if not scroll_bar_BoxGuiObject0 then
+	-- 	return
+	-- end
+
+	-- for k, panel in ipairs(scroll_bar_BoxGuiObject0:children()) do
+	-- 	panel:set_visible(false)
+	-- end
+
+	-- local canvas_bg = scroll_bar_BoxGuiObject0:rect({
+	-- 	color = data.main_color,
+	-- 	alpha = 1,
+	-- 	w = scroll_bar_BoxGuiObject0:w(),
+	-- 	h = scroll_bar_BoxGuiObject0:h()
+	-- })
+
+	-- self:panel():set_w(self:canvas():w() + scroll_bar:w() + 3) 
+
+	-- scroll_bar:set_left(self:canvas():right())
+	-- self._scroll:panel():child("scroll_up_indicator_arrow"):set_center_x(scroll_bar:center_x())
+	-- self._scroll:panel():child("scroll_down_indicator_arrow"):set_center_x(scroll_bar:center_x())
+
+	-- local widget_panel = nil
+
+	-- self._child_classes = {}
+
+	-- local function add_child(widget)
+	-- 	if widget.type then
+	-- 		local widget_class = rawget(_G, widget.type):new(self:canvas(), widget, unpack(widget.params or {}))
+	-- 		widget_panel = widget_class:panel()
+	-- 		self._child_classes[#self._child_classes + 1] = widget_class
+	-- 	else
+	-- 		widget_panel = self:canvas():panel(widget)
+	-- 	end
+
+	-- 	widget_panel:set_w(widget.w or self:canvas():w())
+	-- 	widget_panel:set_h(widget.h or self:canvas():h())
+
+	-- 	self:add_item(widget_panel)
+	-- end
+
+	-- for _, d_widget in ipairs(data.widgets or {}) do
+	-- 	add_child(d_widget)
+	-- end
+	
+	-- if data.widgets_table then
+	-- 	for key, index_data in pairs(data.widgets_table.indices) do
+	-- 		local widget_data = data.widgets_table.callback_return(key, index_data)
+	-- 		add_child(widget_data)
+	-- 	end
+	-- end
+end
+
+function PRebornHorizontalScrollItemList:panel()
+	return self._panel
+end
+
+function PRebornHorizontalScrollItemList:parent()
+	return self._parent
+end
+
+function PRebornHorizontalScrollItemList:destroy()
+	self:parent():remove(self._panel)
+end
+
+function PRebornHorizontalScrollItemList:mouse_moved(o, x, y)
+	if not self._panel:visible() then
+		return false
+	end
+
+	local mouse_inside = false
+
+	for _, class in ipairs(self._child_classes) do
+		mouse_inside = class:mouse_moved(o, x, y) or mouse_inside
+	end
+
+	return mouse_inside
+end
+
+function PRebornHorizontalScrollItemList:mouse_pressed(button, x, y)
+	if not self._panel:visible() then
+		return
+	end
+
+	for _, class in ipairs(self._child_classes) do
+		class:mouse_pressed(button, x, y)
+	end
+
+	if button == Idstring("mouse wheel up") then
+		return self:mouse_wheel_up(x, y)
+	elseif button == Idstring("mouse wheel down") then
+		return self:mouse_wheel_down(x, y)
+	end
+
+	self.super.mouse_pressed(self, button, x, y)
+end
+
+function PRebornHorizontalScrollItemList:mouse_wheel_up(x, y)
+	if not alive(self._scroll) then
+		return
+	end
+
+	self._scroll:scroll(x, y, self._dy)
+
+	if not self._scroll:panel():inside(x, y) then
+		return
+	end
+
+	return PRebornHorizontalScrollItemList.super.super.super.super.mouse_wheel_up(self, x, y)
+end
+
+function PRebornHorizontalScrollItemList:mouse_wheel_down(x, y)
+	if not alive(self._scroll) then
+		return
+	end
+
+	self._scroll:scroll(x, y, -self._dy)
+
+	if not self._scroll:panel():inside(x, y) then
+		return
+	end
+
+	return PRebornHorizontalScrollItemList.super.super.super.super.mouse_wheel_down(self, x, y)
+end
+
+PRebornVerticalScrollItemListSimple = PRebornVerticalScrollItemListSimple or class()
+
+function PRebornVerticalScrollItemListSimple:init(panel, data)
 	self._parent = panel
 	self._panel = panel:panel(data)
 	self._data = data
@@ -867,23 +1098,23 @@ function PRebornScrollListSimple:init(panel, data)
 	self._callback = data.callback
 end
 
-function PRebornScrollListSimple:panel()
+function PRebornVerticalScrollItemListSimple:panel()
 	return self._panel
 end
 
-function PRebornScrollListSimple:parent()
+function PRebornVerticalScrollItemListSimple:parent()
 	return self._parent
 end
 
-function PRebornScrollListSimple:destroy()
+function PRebornVerticalScrollItemListSimple:destroy()
 	self:parent():remove(self._panel)
 end
 
-function PRebornScrollListSimple:canvas()
+function PRebornVerticalScrollItemListSimple:canvas()
 	return self._canvas
 end
 
-function PRebornScrollListSimple:add_item(item, force_visible, at_index, selected)
+function PRebornVerticalScrollItemListSimple:add_item(item, force_visible, at_index, selected)
 	if force_visible ~= nil then
 		item:set_visible(force_visible)
 	end
@@ -926,7 +1157,7 @@ function PRebornScrollListSimple:add_item(item, force_visible, at_index, selecte
 	return item
 end
 
-function PRebornScrollListSimple:set_selected_solo(key)
+function PRebornVerticalScrollItemListSimple:set_selected_solo(key)
 	for k, item in pairs(self._current_items) do
 		if k == key then
 			self:set_selected(k)
@@ -936,7 +1167,7 @@ function PRebornScrollListSimple:set_selected_solo(key)
 	end
 end
 
-function PRebornScrollListSimple:set_selected(key)
+function PRebornVerticalScrollItemListSimple:set_selected(key)
 	self._selected = key
 
 	if self._selection_mode == 1 then
@@ -946,7 +1177,7 @@ function PRebornScrollListSimple:set_selected(key)
 	end
 end
 
-function PRebornScrollListSimple:set_unselected(key)
+function PRebornVerticalScrollItemListSimple:set_unselected(key)
 	if self._selection_mode == 1 then
 		self._rects[key]:set_visible(false)
 	elseif self._selection_mode == 2 then
@@ -954,15 +1185,15 @@ function PRebornScrollListSimple:set_unselected(key)
 	end
 end
 
-function PRebornScrollListSimple:items()
+function PRebornVerticalScrollItemListSimple:items()
 	return self._current_items
 end
 
-function PRebornScrollListSimple:all_items()
+function PRebornVerticalScrollItemListSimple:all_items()
 	return self._all_items
 end
 
-function PRebornScrollListSimple:perform_scroll(speed, direction)
+function PRebornVerticalScrollItemListSimple:perform_scroll(speed, direction)
 	if self:canvas():h() <= self:panel():h() then
 		return
 	end
@@ -975,7 +1206,7 @@ function PRebornScrollListSimple:perform_scroll(speed, direction)
 	self:canvas():set_y(new_y)
 end
 
-function PRebornScrollListSimple:scroll(x, y, dy)
+function PRebornVerticalScrollItemListSimple:scroll(x, y, dy)
 	if self:panel():inside(x, y) then
 		self:perform_scroll(dy, 1)
 
@@ -983,15 +1214,15 @@ function PRebornScrollListSimple:scroll(x, y, dy)
 	end
 end
 
-function PRebornScrollListSimple:set_callback(callback)
+function PRebornVerticalScrollItemListSimple:set_callback(callback)
 	self._callback = callback
 end
 
-function PRebornScrollListSimple:callback()
+function PRebornVerticalScrollItemListSimple:callback()
 	return self._callback
 end
 
-function PRebornScrollListSimple:mouse_moved(o, x, y)
+function PRebornVerticalScrollItemListSimple:mouse_moved(o, x, y)
 	if not self._panel:visible() or not self._canvas:visible() then
 		return false
 	end
@@ -1013,7 +1244,7 @@ function PRebornScrollListSimple:mouse_moved(o, x, y)
 	return mouse_inside
 end
 
-function PRebornScrollListSimple:mouse_pressed(button, x, y)
+function PRebornVerticalScrollItemListSimple:mouse_pressed(button, x, y)
 	if not self._panel:visible() or not self._canvas:visible() then
 		return
 	end
@@ -1043,15 +1274,15 @@ function PRebornScrollListSimple:mouse_pressed(button, x, y)
 	end
 end
 
-function PRebornScrollListSimple:mouse_wheel_up(x, y)
+function PRebornVerticalScrollItemListSimple:mouse_wheel_up(x, y)
 	self:scroll(x, y, self._dy)
 end
 
-function PRebornScrollListSimple:mouse_wheel_down(x, y)
+function PRebornVerticalScrollItemListSimple:mouse_wheel_down(x, y)
 	self:scroll(x, y, -self._dy)
 end
 
-function PRebornScrollListSimple:mouse_released(button, x, y)
+function PRebornVerticalScrollItemListSimple:mouse_released(button, x, y)
 end
 
 PRebornSearchBox = PRebornSearchBox or class(SearchBoxGuiObject)
@@ -1070,7 +1301,7 @@ function PRebornBoxGuiObject:_create_side(panel, side, type, texture, one_two_al
 	local ids_top = Idstring("top")
 	local ids_bottom = Idstring("bottom")
 	local left_or_right = false
-	local w, h = nil
+	local w, h
 
 	if ids_side == ids_left or ids_side == ids_right then
 		left_or_right = true
@@ -1191,5 +1422,3 @@ function PRebornBoxGuiObject:_create_side(panel, side, type, texture, one_two_al
 
 	return side_panel
 end
-
-

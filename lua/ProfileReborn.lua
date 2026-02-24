@@ -13,8 +13,12 @@ function ProfileReborn:init()
 	self._wheel_scroll_value = 3  --浏览下拉Profile列表的速度
 	self._wheel_scroll_value_custom = 15  --左列表文字系列的下拉速度
 	self._filter_list_h = 30  --左文字列表的高度
+	self._profile_list_w = 800
+	self._profile_list_h = 500
 	self._bg_h = 100  --Profile显示的高度
 	self._max_length = 15  --Custom筛选器输入命名的最大长度
+	self._max_perk_index = 30  --最大可显示的perk deck筛选器
+	self.padding_top = 5
 
 	self._normal_text_color = Color.white  --主题文字颜色
 	self._profile_name_color = self._normal_text_color  --Profile名称的颜色
@@ -60,12 +64,12 @@ function ProfileReborn:active()
 
 	self._controller_cls = {}
 	
-	self._controller_cls.profile_list = PRebornScrollList:new(self._ws:panel(), {
+	self._controller_cls.profile_list = PRebornVerticalScrollItemList:new(self._ws:panel(), {
 		scrollbar_padding = 0,
 		bar_minimum_size = 16,
 		padding = 0,
-		w = 800,
-		h = 500,
+		w = self._profile_list_w,
+		h = self._profile_list_h,
 		input_focus = true,
 		layer = self._ui_layer,
 		dy = self._wheel_scroll_value,
@@ -194,16 +198,6 @@ function ProfileReborn:active()
 		w = self._canvas:w(),
 		h = self._canvas:h()
 	})
-	
-	--创建滚动条
-	self._scroll_bar = self._canvas:rect({
-	    name = "scroll_bar",
-	    color = Color.white,
-	    visible = false,
-	    color = Color(0.5,0.5,0.5),
-		layer = -1
-	})
-	self._scroll_bar:set_w(2)
 
 	-- self:create_side(self._canvas)
 	self:create_side(self._filter)
@@ -267,20 +261,25 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 	local tool_visible = tool or false
 
 	if not to_profiles then
-		self.profiles[profile_idx] = profile
+		self.profiles[idx] = profile
 	end
 	
 	local text = profile.name or "Profile " .. profile_idx or idx
 
 	self._controller_cls["profile" .. idx] = PRebornButton:new(self._canvas, {
-		layer = profile_idx or 0, --借用层级，存取profile编号
+		layer = profile_idx, --借用层级，存取profile编号
 		w = self._rect:w(),
 		h = self._bg_h,
 		selection_mode = 5,
 		callback = function()
 			if alive(self._ws) then
-				managers.multi_profile:set_current_profile(profile_idx or idx)
+				managers.multi_profile:set_current_profile(profile_idx)
 				self:hide()
+			end
+		end,
+		right_callback = function()
+			if alive(self._ws) then
+				self:add_move_index(idx)
 			end
 		end
 	})
@@ -380,7 +379,7 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 				local f = idx
 				local t = idx + 1
 
-				self:swap_profile(f, t)
+				self:custom_filter_swap_profile(f, t)
 				self:switch_filter(3, self.custom.current_custom_filter)
 				managers.mouse_pointer:set_pointer_image("arrow")
 			end
@@ -411,7 +410,7 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 				local f = idx
 				local t = idx - 1
 						
-				self:swap_profile(f, t)
+				self:custom_filter_swap_profile(f, t)
 				self:switch_filter(3, self.custom.current_custom_filter)
 				managers.mouse_pointer:set_pointer_image("arrow")
 			end
@@ -464,6 +463,7 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 	end
 
 	local profile_text = panel:text({
+		name = "profile_text",
 		font = tweak_data.hud_players.ammo_font,
 		text = text,
 		color = text_color,
@@ -541,16 +541,18 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 	local tec_skillpoints = "Tec:" .. pad(skillpoints[7]) .. " " .. pad(skillpoints[8]) .. " " .. pad(skillpoints[9])
 	local gho_skillpoints = "Gho:" .. pad(skillpoints[10]) .. " " .. pad(skillpoints[11]) .. " " .. pad(skillpoints[12])
 	local fug_skillpoints = "Fug:" .. pad(skillpoints[13]) .. " " .. pad(skillpoints[14]) .. " " .. pad(skillpoints[15])
-	local skillpoint_text = mas_skillpoints .. "   " .. enf_skillpoints .. "   " .. tec_skillpoints .. "   " .. gho_skillpoints .. "   " .. fug_skillpoints
+	local skillpoint_text = mas_skillpoints .. "   " .. enf_skillpoints .. "   " .. tec_skillpoints .. "   " .. gho_skillpoints .. "   " .. fug_skillpoints 
+	-- Skillpoints 1.11 fix by Nexqua
 	local skillpoints_text = panel:text({
 		vertical = "top",
 		font = tweak_data.hud_players.ammo_font,
 		text = skillpoint_text,
 		font_size = 13,
 		layer = 3,
-		x = secondary_weapon:left(),
+		x = secondary_weapon:right() + 20, -- /c secondary_weapon:left()
+		y = self.padding_top, -- /a
 		color = self._profile_skillpoints_text_color
-	})		
+	})	
 	local throwable = profile.throwable
 	local texture = self:get_projectiles_icon(throwable)
 	local projectile = panel:bitmap({
@@ -637,13 +639,11 @@ end
 function ProfileReborn:show()
 	self._bg:show()
 	self._panel:show()
-		
-	local active_menu = managers.menu:active_menu()
-	local is_pc_controller = managers.menu:is_pc_controller()
-	if active_menu and not is_pc_controller then
-		active_menu.input:activate_controller_mouse()
-	end
-	
+
+	if not managers.menu:is_pc_controller() then
+		self:activate_controller_mouse()
+	end	
+
 	self._mouse_id = self._mouse_id or managers.mouse_pointer:get_id()
 	self._mouse_data = {
 		mouse_move = callback(self, self, "mouse_moved"),
@@ -655,10 +655,10 @@ function ProfileReborn:show()
 	}
 	managers.mouse_pointer:use_mouse(self._mouse_data)
 
-	local controller = managers.controller:get_controller_by_name("MenuManager")
+	local menu_controller = managers.controller:get_controller_by_name("MenuManager")
 	
-	if controller then
-		controller:set_enabled(false)
+	if menu_controller then
+		menu_controller:set_enabled(false)
 	end
 	
 	managers.menu:active_menu().input:set_back_enabled(false)
@@ -666,27 +666,168 @@ function ProfileReborn:show()
 end
 
 function ProfileReborn:hide()
+	self:reset_panel()
+
 	managers.mouse_pointer:remove_mouse(self._mouse_data)
 	
-	local active_menu = managers.menu:active_menu()
-	local is_pc_controller = managers.menu:is_pc_controller()
-	if active_menu and not is_pc_controller then
-		active_menu.input:activate_controller_mouse()
+	if not managers.menu:is_pc_controller() then
+		self:deactivate_controller_mouse()
 	end
 	
 	self._ws:hide()
 	managers.gui_data:destroy_workspace(self._ws)
 	
-	local controller = managers.controller:get_controller_by_name("MenuManager")
+	local menu_controller = managers.controller:get_controller_by_name("MenuManager")
 	
-	if controller then
-		controller:set_enabled(true)
+	if menu_controller then
+		menu_controller:set_enabled(true)
 	end
 	
 	managers.menu:active_menu().input:set_back_enabled(true)
 	managers.menu:active_menu().input:accept_input(true)
 	
 	self:save()
+end
+
+function ProfileReborn:activate_controller_mouse()
+	self._controller = managers.controller:create_controller(nil, nil, false)
+	self._controller:set_enabled(true)
+	managers.mouse_pointer:change_mouse_to_controller(self._controller:get_controller())
+
+	self._controller:add_release_trigger("confirm", function()
+		-- 控制器会在子菜单关闭的按钮（B）按下并关闭子菜单后，会检测关闭子菜单的按键（B）并触发一次trigger
+		-- 必须加上一些判断才能避免错误返回
+		if self._controller_deactivated then
+			self._controller_deactivated = nil
+			return
+		end
+
+		if self._editing then
+			self:key_release(nil, Idstring("enter"))
+		else
+			self:mouse_pressed(nil, Idstring("0"), self._mouse_x or 0, self._mouse_y or 0)
+		end
+	end)
+
+	self._controller:add_trigger("cancel", function()
+		if self._controller_deactivated then
+			return
+		end
+
+		self:key_release(nil, Idstring("esc"))
+	end)
+
+	self._controller:add_release_trigger("cancel", function()
+		self._controller_deactivated = nil
+	end)
+
+	self._controller:add_release_trigger("y", function()
+		if self._controller_deactivated then
+			return
+		end
+
+		self:mouse_pressed(nil, Idstring("1"), self._mouse_x or 0, self._mouse_y or 0)
+	end)
+
+	self._controller:add_trigger("previous_page", function()
+		if self._controller_deactivated then
+			return
+		end
+
+		self:switch_filter(self._current_filter - 1)
+	end)
+
+	self._controller:add_trigger("next_page", function()
+		if self._controller_deactivated then
+			return
+		end
+
+		self:switch_filter(self._current_filter + 1)
+	end)
+
+	self._controller:add_trigger("menu_change_profile_left", function()
+		if self._controller_deactivated then
+			return
+		end
+
+		if self._current_filter == 2 then
+			self:switch_perk(self:get_filter_previous_perk())
+		elseif self._current_filter == 3 then
+			local new_key = self.custom.current_custom_filter - 1
+			self:switch_custom(new_key)
+			self._controller_cls.filter_list:set_selected_solo(new_key)
+		end
+	end)
+
+
+	self._controller:add_trigger("menu_change_profile_right", function()
+		if self._controller_deactivated then
+			return
+		end
+
+		if self._current_filter == 2 then
+			self:switch_perk(self:get_filter_next_perk())
+		elseif self._current_filter == 3 then
+			local new_key = self.custom.current_custom_filter + 1
+			self:switch_custom(new_key)
+			self._controller_cls.filter_list:set_selected_solo(new_key)
+		end
+	end)
+
+	self._ws:connect_controller(self._controller:get_controller(), true)
+	self._ws:panel():axis_move(function(o, axis_name, axis_vector, controller)
+		local y = mvector3.y(axis_vector)
+
+		if y ~= 0 then
+			-- 用BLT的DelayedCalls模拟Update
+			local function axis_update()
+				DelayedCalls:Add("Update:ProfileReborn_axis_moved", 0, axis_update)
+				
+				if axis_name == Idstring("right") then
+					local profile_list = self._controller_cls.profile_list
+					local dt = TimerManager:wall():delta_time()
+					if y > 1 then
+						profile_list._scroll:perform_scroll(8 * dt * 200, profile_list._dy * y)
+					else
+						profile_list._scroll:perform_scroll(8 * dt * 200, profile_list._dy * y)
+					end
+				end
+			end
+
+			axis_update()
+		else
+			DelayedCalls:Remove("Update:ProfileReborn_axis_moved")
+		end
+	end)
+end
+
+function ProfileReborn:deactivate_controller_mouse()
+	if self._controller then
+		managers.mouse_pointer:change_controller_to_mouse()
+		self._controller:remove_release_trigger("confirm")
+		self._controller:remove_trigger("cancel")
+		self._controller:remove_release_trigger("cancel")
+		self._controller:remove_trigger("previous_page")
+		self._controller:remove_trigger("next_page")
+		self._controller:destroy()
+		self._controller = nil
+	end
+end
+
+function ProfileReborn:set_selected(state)
+	self._selected = state
+
+	if not managers.menu:is_pc_controller() then
+		if state then
+			-- 将变量设置为false避免返回ProfileReborn菜单后关闭菜单
+			self._controller_deactivated = true
+			-- 将控制器关闭，避免在触发system_menu后鼠标未隐藏的短时间内按下
+			-- 返回（B）会在下一次按下返回（B）时同时关闭ProfileReborn
+			self._controller:set_enabled(false)
+		else
+			self._controller:set_enabled(true)			
+		end
+	end
 end
 
 function ProfileReborn:reset_panel()
@@ -698,7 +839,10 @@ function ProfileReborn:reset_panel()
 			self._controller_cls[name] = nil
 		end
 	end
-	
+
+	self._wating_move_index = nil
+	self._wating_move_org_text = nil
+
 	self:load()
 	self:save()
 end
@@ -729,7 +873,9 @@ function ProfileReborn:mouse_moved(o, x, y)
 	end
 	
 	-- Profile search box
-	self._mouse_inside = self._profile_searchbox:mouse_moved(o, x, y) and true or self._mouse_inside
+	if self._profile_searchbox then
+		self._mouse_inside = self._profile_searchbox:mouse_moved(o, x, y) and true or self._mouse_inside
+	end
 
 	if self._mouse_inside then
 		managers.mouse_pointer:set_pointer_image("link")
@@ -742,8 +888,10 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 	if self._editing then
 		return
 	end
-	
-	self._profile_searchbox:mouse_pressed(button, x, y)
+
+	if self._profile_searchbox then
+		self._profile_searchbox:mouse_pressed(button, x, y)
+	end
 
 	if self._selected then
 		return
@@ -752,7 +900,9 @@ function ProfileReborn:mouse_pressed(o, button, x, y)
 	local clses = self:table_clone(self._controller_cls)
 	for k, cls in pairs(clses) do
 		if alive(cls:panel()) then
-			cls:mouse_pressed(button, x, y)
+			if cls:mouse_pressed(button, x, y) then
+				return
+			end
 		end
 	end
 end
@@ -806,13 +956,21 @@ function ProfileReborn:key_release(o, k)
 	end
 end
 
+function ProfileReborn:profile_list()
+	return self._controller_cls.profile_list
+end
+
 function ProfileReborn:set_default_profile()
 	for idx, profile in pairs(managers.multi_profile._global._profiles) do
 		self:set_profile(idx, profile, idx)
 	end
 end
 
-function ProfileReborn:set_perk_desk_profile()
+function ProfileReborn:set_perk_deck_profile(base_filter)
+	if not alive(self._ws) then
+		return
+	end
+
 	self.perk_deck.perks = {}
 	for idx, profile in pairs(managers.multi_profile._global._profiles) do
 		self.perk_deck.perks[profile.perk_deck] = self.perk_deck.perks[profile.perk_deck] or {}
@@ -827,7 +985,7 @@ function ProfileReborn:set_perk_desk_profile()
 		name = "left_list"
 	})
 
-	self._controller_cls.perk_icon = PRebornScrollListSimple:new(leftlist_panel, {
+	self._controller_cls.perk_icon = PRebornVerticalScrollItemListSimple:new(leftlist_panel, {
 		layer = self._ui_layer + 1,
 		w = 50,
 		h = self._panel:h(),
@@ -836,7 +994,7 @@ function ProfileReborn:set_perk_desk_profile()
 		selection_mode = 2
 	})
 
-	self._controller_cls.perk_text = PRebornScrollListSimple:new(leftlist_panel, {
+	self._controller_cls.perk_text = PRebornVerticalScrollItemListSimple:new(leftlist_panel, {
 		layer = self._ui_layer + 1,
 		w = 200,
 		h = self._panel:h(),
@@ -847,7 +1005,7 @@ function ProfileReborn:set_perk_desk_profile()
 	})
 
 	-- 创建文字排序的主panel
-	self._controller_cls.perk_text_sort = PRebornScrollListSimple:new(leftlist_panel, {
+	self._controller_cls.perk_text_sort = PRebornVerticalScrollItemListSimple:new(leftlist_panel, {
 		layer = self._ui_layer + 1,
 		w = 200,
 		h = self._panel:h(),
@@ -889,7 +1047,7 @@ function ProfileReborn:set_perk_desk_profile()
 	
 	self.perk_deck.display_mode = self.save_data.perk_deck_display_mode or 1
 	
-	for perk = 1, 30 do if self.perk_deck.perks[perk] then
+	for perk = 1, self._max_perk_index do if self.perk_deck.perks[perk] then
 		local perk_deck = tweak_data.skilltree.specializations[perk]
 		if perk_deck then
 			-- display_mode 1
@@ -1079,7 +1237,7 @@ function ProfileReborn:set_perk_desk_profile()
 	end
 
 	local current_profile = managers.multi_profile:current_profile()
-	self:switch_perk(current_profile.perk_deck)
+	self:switch_perk(base_filter or current_profile.perk_deck)
 end
 
 function ProfileReborn:set_custom_profile(base_filter)
@@ -1091,7 +1249,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 	
 	local filters = self.custom.filters
 
-	self._controller_cls.filter_list = PRebornScrollListSimple:new(self._ws:panel(), {
+	self._controller_cls.filter_list = PRebornVerticalScrollItemListSimple:new(self._ws:panel(), {
 		layer = self._ui_layer,
 		w = 200,
 		h = self._canvas:h(),
@@ -1178,7 +1336,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 		first_filter_panel:hide()
 	end
 
-	self._controller_cls.tool_list = PRebornScrollListSimple:new(self._ws:panel(), {
+	self._controller_cls.tool_list = PRebornVerticalScrollItemListSimple:new(self._ws:panel(), {
 		layer = self._ui_layer,
 		w = 50,
 		h = self._canvas:h(),
@@ -1250,7 +1408,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 					text = text,
 					callback_func = function ()
 						self:add_profile_callback(profile, idx)
-						self._selected = false
+						self:set_selected(false)
 					end,
 					focus_callback_func = function ()
 					end
@@ -1269,7 +1427,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 				focus_callback_func = function ()
 				end,
 				callback_func = function ()
-					self._selected = false
+					self:set_selected(false)
 				end,
 				cancel_button = true
 			}
@@ -1291,7 +1449,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 							
 			managers.system_menu:show_buttons(dialog_data)
 							
-			self._selected = true
+			self:set_selected(true)
 		end
 	})
 
@@ -1347,7 +1505,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 
 			if #self.custom.filters > 0 then
 				if ccf > 1 then
-					self:swap_filter(ccf, ccf - 1)
+					self:custom_filter_swap_filter(ccf, ccf - 1)
 					self:switch_filter(3, ccf-1)
 				end
 			else
@@ -1380,7 +1538,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 
 			if #self.custom.filters > 0 then
 				if ccf < #self.custom.filters then
-					self:swap_filter(ccf, ccf + 1)
+					self:custom_filter_swap_filter(ccf, ccf + 1)
 					self:switch_filter(3, ccf + 1)
 				end
 			else
@@ -1440,14 +1598,14 @@ function ProfileReborn:set_custom_profile(base_filter)
 						
 					self:switch_filter(3, ccf)
 						
-					self._selected = false
+					self:set_selected(false)
 				end
 			}
 			local no_button = {
 				text = managers.localization:text("dialog_cancel"),
 				cancel_button = true,
 				callback_func = function()
-					self._selected = false
+					self:set_selected(false)
 				end
 			}
 			dialog_data.button_list = {
@@ -1457,7 +1615,7 @@ function ProfileReborn:set_custom_profile(base_filter)
 
 			managers.system_menu:show(dialog_data)
 				
-			self._selected = true
+			self:set_selected(true)
 		end
 	})
 
@@ -1579,7 +1737,7 @@ end
 function ProfileReborn:create_new_filter(name)
 	local key = #self.custom.filters + 1
 	self.custom.filters[key] = {
-		name = name or "CustomFilter#" .. tostring(key),
+		name = name and name ~= "" and name or "CustomFilter#" .. tostring(key),
 		panel = self:create_filter_ui(self._controller_cls.filter_list, name, key),
 		key = key,
 		profiles = {}
@@ -1621,7 +1779,7 @@ function ProfileReborn:create_filter_ui(scroll, name, key)
 	return filter
 end
 
-function ProfileReborn:swap_profile(index1, index2)
+function ProfileReborn:custom_filter_swap_profile(index1, index2)
 	local profiles = self.custom.filters[self.custom.current_custom_filter].profiles
 	
 	local idx1 = profiles[index1].idx
@@ -1633,7 +1791,7 @@ function ProfileReborn:swap_profile(index1, index2)
 	profiles[index2].idx = idx1
 end
 
-function ProfileReborn:swap_filter(index1, index2)
+function ProfileReborn:custom_filter_swap_filter(index1, index2)
 	local filters = self.custom.filters
 	
 	local key1 = filters[index1].key
@@ -1645,6 +1803,87 @@ function ProfileReborn:swap_filter(index1, index2)
 	filters[index2].key = key2
 end
 
+-- 用了比较蠢但是非常方便写的方法来弄移动Profile
+-- 我真感觉这个mod代码越来越shi了，但愿一切正常
+function ProfileReborn:move_profile_by_key(key1, key2)
+	local idx_1 = self._controller_cls["profile" .. key1]:panel():layer()
+	local idx_2 = self._controller_cls["profile" .. key2]:panel():layer()
+	local custom_dy = self._canvas:y()
+
+	self:move_profile(idx_1, idx_2)
+	self:reset_panel()
+
+	local profile_list = self._controller_cls.profile_list
+	self:switch_filter(self._current_filter, self.perk_deck.current_perk, custom_dy)
+end
+
+function ProfileReborn:add_move_index(index)
+	if self._current_filter == 3 then
+		return
+	end
+
+	local profiles = self.profiles
+	local text_panel = self._controller_cls["profile" .. index]:panel():child("profile_text")
+
+	if not self._wating_move_index then
+		self._wating_move_index = index
+		self._wating_move_org_text = text_panel:text()
+		text_panel:set_text(">> " .. text_panel:text())
+	elseif self._wating_move_index == index then
+		self._wating_move_index = nil
+		text_panel:set_text(self._wating_move_org_text)
+	else
+		local wating_move_text_panel = self._controller_cls["profile" .. self._wating_move_index]:panel():child("profile_text")
+		wating_move_text_panel:set_text(self._wating_move_org_text)
+
+		self:move_profile_by_key(self._wating_move_index, index)
+		self._wating_move_index = nil
+	end
+end
+
+function ProfileReborn:move_profile(old_index, new_index)
+	local mp = managers.multi_profile
+	local profile = mp:profile(old_index)
+	
+	if not profile then
+		return
+	end
+
+	table.remove(mp._global._profiles, old_index)
+	table.insert(mp._global._profiles, new_index, profile)
+
+	local current_index = mp._global._current_profile
+	local change_start = math.min(old_index, new_index)
+	local change_end = math.max(old_index, new_index)
+
+	if current_index == old_index then
+		mp._global._current_profile = new_index
+
+		mp:save_current()
+	elseif change_start <= current_index and current_index <= change_end then
+		local index_change = old_index < new_index and -1 or 1
+		mp._global._current_profile = mp._global._current_profile + index_change
+
+		mp:save_current()
+	end
+
+	-- 替换custom筛选器的profile索引
+	for _, filter in ipairs(self.custom.filters) do
+	    for _, profile in ipairs(filter.profiles) do
+	        if profile.idx == old_index then
+	            profile.idx = new_index
+	        elseif old_index < profile.idx and profile.idx <= new_index then
+	            profile.idx = profile.idx - 1
+	        elseif new_index <= profile.idx and profile.idx < old_index then
+	            profile.idx = profile.idx + 1
+	        end
+	    end
+	end
+
+	self:save()
+end
+
+
 function ProfileReborn:get_current_custom_filter()
 	return self.custom.filters[self.custom.current_custom_filter]
 end
@@ -1653,7 +1892,7 @@ function ProfileReborn:get_custom_filter(index)
 	return self.custom.filters[index]
 end
 
-function ProfileReborn:switch_filter(value, base_filter)
+function ProfileReborn:switch_filter(value, base_filter, custom_dy)
 	self:save()
 	
 	if value <= 0 then
@@ -1668,13 +1907,14 @@ function ProfileReborn:switch_filter(value, base_filter)
 	if value == 1 then
 		self:set_default_profile()
 	elseif value == 2 then
-		self:set_perk_desk_profile()
+		self:set_perk_deck_profile(base_filter)
 	elseif value == 3 then
 		self:set_custom_profile(base_filter)
 	end
 	
-
-	if self._bg_h * #self:profiles_panel() >= self._panel:h() then
+	if custom_dy then
+		self._controller_cls.profile_list:perform_scroll(custom_dy)
+	elseif self._bg_h * #self:profiles_panel() >= self._panel:h() then
 		local current_ui
 		if self._current_filter ~= 1 then
 			for k, ui in ipairs(self:profiles_panel()) do
@@ -1717,11 +1957,14 @@ function ProfileReborn:switch_perk(perk)
 		end
 
 		self.perk_deck.current_perk = perk
+		
+		self._wating_move_index = nil
+		self._wating_move_org_text = nil
 	end
 end
 
 function ProfileReborn:switch_custom(key)
-	local profile = self.custom.filters[key].profiles
+	local profile = self.custom.filters[key] and self.custom.filters[key].profiles
 	if profile then
 		self:reset_profile_panels()
 	
@@ -1731,6 +1974,38 @@ function ProfileReborn:switch_custom(key)
 		
 		self.custom.current_custom_filter = key
 		managers.mouse_pointer:set_pointer_image("arrow")
+	end
+end
+
+function ProfileReborn:get_filter_previous_perk()
+	local current_perk = self.perk_deck.current_perk
+
+	if current_perk == 1 then
+		return nil
+	end
+
+	for perk_index = current_perk - 1, 1, -1 do
+		local profile = self.perk_deck.perks[perk_index]
+
+		if profile then
+			return perk_index
+		end
+	end
+end
+
+function ProfileReborn:get_filter_next_perk()
+	local current_perk = self.perk_deck.current_perk
+
+	if current_perk == self._max_perk_index then
+		return nil
+	end
+
+	for perk_index = current_perk + 1, self._max_perk_index do
+		local profile = self.perk_deck.perks[perk_index]
+
+		if profile then
+			return perk_index
+		end
 	end
 end
 
@@ -1754,7 +2029,7 @@ function ProfileReborn:open_add_profile_confirm()
 				text = text,
 				callback_func = function ()
 					self:add_profile_callback(profile, idx)
-					self._selected = false
+					self:set_selected(false)
 				end,
 				focus_callback_func = function ()
 				end
@@ -1773,7 +2048,7 @@ function ProfileReborn:open_add_profile_confirm()
 			focus_callback_func = function ()
 			end,
 			callback_func = function ()
-				self._selected = false
+				self:set_selected(false)
 			end,
 			cancel_button = true
 		}
@@ -1795,7 +2070,7 @@ function ProfileReborn:open_add_profile_confirm()
 					
 		managers.system_menu:show_buttons(dialog_data)
 					
-		self._selected = true
+		self:set_selected(true)
 	else
 		self:dialog_please_create_a_filter()
 	end
@@ -1817,7 +2092,7 @@ function ProfileReborn:dialog_please_create_a_filter()
 		text = managers.localization:text("dialog_ok"),
 		cancel_button = true,
 		callback_func = function()
-			self._selected = false
+			self:set_selected(false)
 		end
 	}
 	dialog_data.button_list = {
@@ -1826,7 +2101,7 @@ function ProfileReborn:dialog_please_create_a_filter()
 
 	managers.system_menu:show(dialog_data)
 	
-	self._selected = true
+	self:set_selected(true)
 end
 
 function ProfileReborn:update_items_list(scroll_position, search_list, search_text)
@@ -2173,4 +2448,18 @@ function ProfileReborn:table_clone(tb)
 	end
 
 	return new_tb
+end
+
+local old_MenuManager_open_node = MenuManager.open_node
+function MenuManager:open_node(node_name, ...)
+	if node_name == "profile_switch" then
+		if managers.multi_profile.profile_reborn then
+			managers.multi_profile:save_current()
+			managers.multi_profile.profile_reborn:active()
+
+			return
+		end
+	end
+
+	return old_MenuManager_open_node(self, node_name, ...)
 end
