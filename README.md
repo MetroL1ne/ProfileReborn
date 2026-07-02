@@ -1,10 +1,18 @@
 # Change log
+**1.12**
+- Added a function to automatically change skill set order when changing profile order
+- Added a setting to adjust the scroll sensitivity of the profile list
+- Added a new profile sorting option (by name)
+- Change all perk icons from the first card to the last card
+- Fixed hit detection issues with the profile button
+- Thanks to rowyag for translating the v1.12 changelog into english
+- v1.12 Changelog translated by rowyag
+
 **1.11**
 - Adapted to the latest game version (u243)
 - Added support for controllers
 - Added reorder buttons for sorting your builds
 - Adjusted the position of skill display
-- Fixed hit detection issues with the profile button
 
 **1.102**
 - Fixed the crash caused by PAYDAY 2 Update 242

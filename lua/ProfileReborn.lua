@@ -10,7 +10,7 @@ DB:create_entry(Idstring("texture"), Idstring("guis/textures/pd2/profile_rebvorn
 
 function ProfileReborn:init()
 	self._ui_layer = 500  --整体UI的层级
-	self._wheel_scroll_value = 3  --浏览下拉Profile列表的速度
+	self._wheel_scroll_value = 3  --浏览下拉Profile列表的速度（Obsolete）
 	self._wheel_scroll_value_custom = 15  --左列表文字系列的下拉速度
 	self._filter_list_h = 30  --左文字列表的高度
 	self._profile_list_w = 800
@@ -35,9 +35,9 @@ function ProfileReborn:init()
 
 	--筛选器列表
 	self.filter_method = {
-		"default",
-		"perk_deck",
-		"custom"
+		string.upper(managers.localization:text("menu_bp_filter_" .. "default")),
+		string.upper(managers.localization:text("menu_bp_filter_" .. "perk_deck")),
+		string.upper(managers.localization:text("menu_bp_filter_" .. "custom"))
 	}
 	
 	--Perk Deck筛选器显示方式列表
@@ -50,8 +50,7 @@ function ProfileReborn:init()
 	self._reset_ignore = {
 		["profile_list"] = true,
 		["filter"] = true,
-		["set_filter_left"] = true,
-		["set_filter_right"] = true
+		["profile_sort_mode"] = true
 	}
 
 	--初始化记录鼠标指针位置
@@ -72,7 +71,7 @@ function ProfileReborn:active()
 		h = self._profile_list_h,
 		input_focus = true,
 		layer = self._ui_layer,
-		dy = self._wheel_scroll_value,
+		dy = ProfileRebornSettings.settings.WheelScrollValue,
 		main_color = self._main_color
 	}, {
 		padding = 0
@@ -87,101 +86,61 @@ function ProfileReborn:active()
 	
 	self:load()
 
+	-- Filter toggle
 	self._current_filter = self.save_data and self.save_data.current_filter or 1
-	self._controller_cls.filter = PRebornButton:new(self._ws:panel(), {
+	self._controller_cls.filter = PRebornMultipleToggle:new(self._ws:panel(), {
 		layer = self._ui_layer,
 		w = 150,
 		h = 30,
 		bg = true,
 		bg_color = self._filter_bg_color,
-		bg_alpha = 0,
 		bg_layer = -49,
-		active = false
-	})
-	
-	self._filter = self._controller_cls.filter:panel()
-
-	self._filter:set_left(self._panel:left())
-	self._filter:set_top(self._panel:bottom() + 2)
-	local menu_arrows_texture = "guis/textures/menu_arrows"
-
-	self._controller_cls.set_filter_left = PRebornButton:new(self._filter, {
-		w = self._filter:h(),
-		h = self._filter:h(),
-		selection_mode = 2,
-		callback = function()
-			self:switch_filter(self._current_filter - 1)
+		text_color = self._filter_method_font_color,
+		index = self._current_filter,
+		items = {
+			string.upper(managers.localization:text("menu_bp_filter_default")),
+			string.upper(managers.localization:text("menu_bp_filter_perk_deck")),
+			string.upper(managers.localization:text("menu_bp_filter_custom"))			
+		},
+		callback = function(index)
+			self:switch_filter(index)
 		end
 	})
 
-	local arrow_left_panel = self._controller_cls.set_filter_left:panel()
+	filter = self._controller_cls.filter:panel()
 
-	local arrow_left = arrow_left_panel:bitmap({
-		texture = menu_arrows_texture,
-		layer = 2,
-		texture_rect = {
-			0,
-			0,
-			24,
-			24
-		}
-	})
+	filter:set_left(self._panel:left())
+	filter:set_top(self._panel:bottom() + 2)
 
-	arrow_left_panel:set_center_y(self._filter:h() / 2)
-	arrow_left:set_center_y(arrow_left_panel:h() / 2)
-
-	self._controller_cls.set_filter_right = PRebornButton:new(self._filter, {
-		w = self._filter:h(),
-		h = self._filter:h(),
-		selection_mode = 2,
-		callback = function()
-			self:switch_filter(self._current_filter + 1)
+	-- Profile sort mode
+	self._profile_sort_mode = self.save_data and self.save_data.profile_sort_mode or 1
+	self._controller_cls.profile_sort_mode = PRebornMultipleToggle:new(self._ws:panel(), {
+		layer = self._ui_layer,
+		w = 150,
+		h = 30,
+		bg = true,
+		bg_color = self._filter_bg_color,
+		bg_layer = -49,
+		text_color = self._filter_method_font_color,
+		index = self._profile_sort_mode,
+		items = {
+			string.upper(managers.localization:text("menu_bp_profile_sort_mode_build_order")),
+			string.upper(managers.localization:text("menu_bp_profile_sort_mode_build_name"))	
+		},
+		callback = function(index)
+			self._profile_sort_mode = index
+			self:sort_profiles_by_mode()
+			self:reset_panel()
+			self:switch_filter(self._current_filter)
 		end
 	})
 
-	local arrow_right_panel = self._controller_cls.set_filter_right:panel()
+	profile_sort_mode = self._controller_cls.profile_sort_mode:panel()
 
-	local arrow_right = arrow_right_panel:bitmap({
-		texture = menu_arrows_texture,
-		layer = 2,
-		rotation = 180,
-		texture_rect = {
-			0,
-			0,
-			24,
-			24
-		}
-	})
+	profile_sort_mode:set_left(filter:right() + 0.6)
+	profile_sort_mode:set_top(filter:top())
 
-	arrow_right_panel:set_right(self._filter:w())
-	arrow_right_panel:set_center_y(self._filter:h() / 2)
-	arrow_right:set_right(arrow_right_panel:w())
-	arrow_right:set_center_y(arrow_right_panel:h() / 2)
-
-	for layer, method in ipairs(self.filter_method) do
-		self._filter:text({
-			name = "bp_filter_" .. method,
-			visible = layer == self._current_filter,
-			vertical = "center",
-			valign = "center",
-			align = "center",
-			halign = "center",
-			font = tweak_data.hud_players.ammo_font,
-			text = string.upper(managers.localization:text("menu_bp_filter_" .. method)),
-			font_size = 18,
-			layer = layer,
-			color = self._filter_method_font_color
-		})
-	end
-	
-	self._filter_bg = self._filter:rect({
-		color = Color.black,
-		alpha = 0.9,
-		layer = -50,
-		w = self._filter:w(),
-		h = self._filter:h()
-	})
-	
+	-- Main background
 	self._bg = self._ws:panel():bitmap({
 		render_template = "VertexColorTexturedBlur3D",
 		texture = "guis/textures/test_blur_df",
@@ -199,14 +158,11 @@ function ProfileReborn:active()
 		h = self._canvas:h()
 	})
 
-	-- self:create_side(self._canvas)
-	self:create_side(self._filter)
-	
 	self.profiles = {}
 	self.perk_deck = {}
 	self.perk_deck.perks = {}
 	self.perk_deck.deck_list = {}
-	
+
 	if not self.custom then
 		self:set_custom_profile()
 	end
@@ -258,6 +214,9 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 		return
 	end
 	
+	profile.bp = {}
+	profile.bp.idx = profile_idx or idx
+
 	local tool_visible = tool or false
 
 	if not to_profiles then
@@ -302,11 +261,9 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 	local perk_deck = tweak_data.skilltree.specializations[profile.perk_deck]
 
 	if perk_deck then
-		local icon_atlas_texture, texture_rect, multi_choice_icon = self:get_specialization_icon(perk_deck[1])
-		
-		if profile.perk_deck == 1 then
-			icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[9])		
-		elseif profile.perk_deck == 23 then
+		local icon_atlas_texture, texture_rect, multi_choice_icon = self:get_specialization_icon(perk_deck[9])
+
+		if profile.perk_deck == 23 then
 			icon_atlas_texture, texture_rect, multi_choice_icon = self:get_specialization_icon(perk_deck[9], profile.perk_deck_choices[9])
 		end
 
@@ -435,6 +392,10 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 	function cls:inside(x, y)
 		if not managers.multi_profile.profile_reborn._panel:inside(x, y) then
 			return
+		end
+		
+		if not tool_visible then
+			return old_inside_func(self, x, y)
 		end
 
 		if tool_visible then
@@ -623,6 +584,26 @@ function ProfileReborn:set_profile(idx, profile, profile_idx, tool, to_profiles)
 		x = mask:right() + 15
 	})
 	armor:set_center_y(profile_bg:center_y())
+end
+
+-- Sort profiles by mode
+-- set_profile使用完毕后执行
+function ProfileReborn:sort_profiles_by_mode()
+	if self._profile_sort_mode == 2 then
+		local copyed_prorfiles = table.map_copy(self.profiles)
+
+		table.sort(copyed_prorfiles, function(a, b)
+			local a_name = a.name or "Profile " .. a.bp.idx
+			local b_name = b.name or "Profile " .. b.bp.idx
+			return a_name < b_name
+		end)
+
+		self:reset_profile_panels()
+
+		for idx, profile in pairs(copyed_prorfiles) do
+			self:set_profile(idx, profile, profile.bp.idx)
+		end
+	end
 end
 
 function ProfileReborn:create_side(panel)
@@ -964,6 +945,8 @@ function ProfileReborn:set_default_profile()
 	for idx, profile in pairs(managers.multi_profile._global._profiles) do
 		self:set_profile(idx, profile, idx)
 	end
+
+	self:sort_profiles_by_mode()
 end
 
 function ProfileReborn:set_perk_deck_profile(base_filter)
@@ -1051,11 +1034,9 @@ function ProfileReborn:set_perk_deck_profile(base_filter)
 		local perk_deck = tweak_data.skilltree.specializations[perk]
 		if perk_deck then
 			-- display_mode 1
-			local icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[1])
+			local icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[9])
 			
-			if perk == 1 then
-				icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[9])
-			elseif perk == 23 then
+			if perk == 23 then
 				icon_atlas_texture, texture_rect = self:get_specialization_icon(perk_deck[9])
 			end
 			
@@ -1157,7 +1138,7 @@ function ProfileReborn:set_perk_deck_profile(base_filter)
 
 	local perk_display_mode_panel = self._controller_cls.perk_display_mode_panel:panel()
 
-	perk_display_mode_panel:set_left(self._filter:right())
+	perk_display_mode_panel:set_left(self._controller_cls.profile_sort_mode:panel():right())
 	perk_display_mode_panel:set_top(self._panel:bottom() + 2)
 	
 	local menu_arrows_texture = "guis/textures/menu_arrows"
@@ -1292,6 +1273,8 @@ function ProfileReborn:set_custom_profile(base_filter)
 		for key, data in pairs(filters[base_filter].profiles) do
 			self:set_profile(key, data.profile, data.idx, true)
 		end
+
+		self:sort_profiles_by_mode()
 
 		filter_list:set_selected_solo(base_filter)
 	end
@@ -1728,6 +1711,8 @@ function ProfileReborn:add_profile_callback(profile, idx)
 	
 	self:set_profile(new_profile, profile, idx, true)
 
+	self:sort_profiles_by_mode()
+
 	filter.profiles[new_profile] = {
 		profile = profile,
 		idx = idx
@@ -1818,7 +1803,7 @@ function ProfileReborn:move_profile_by_key(key1, key2)
 end
 
 function ProfileReborn:add_move_index(index)
-	if self._current_filter == 3 then
+	if self._current_filter == 3 or self._profile_sort_mode == 2 then
 		return
 	end
 
@@ -1849,6 +1834,15 @@ function ProfileReborn:move_profile(old_index, new_index)
 		return
 	end
 
+	-- Save deployables
+	local current_profile = mp:profile(mp._global._current_profile)
+	local c_profile_deployable = {}
+	c_profile_deployable[1] = current_profile.deployable
+	c_profile_deployable[2] = current_profile.deployable_secondary
+
+	local old_skill_index = profile.skillset
+
+	-- Move profile position
 	table.remove(mp._global._profiles, old_index)
 	table.insert(mp._global._profiles, new_index, profile)
 
@@ -1867,17 +1861,82 @@ function ProfileReborn:move_profile(old_index, new_index)
 		mp:save_current()
 	end
 
+	-- 移动技能组
+	if ProfileRebornSettings.settings.IsMoveSkillpoint then
+		local skill_switches = managers.skilltree._global.skill_switches
+		
+		-- Move skillset
+		local skillset_data = table.remove(skill_switches, old_skill_index)
+		table.insert(skill_switches, new_index, skillset_data)
+
+		local current_profile_new_skillset = nil
+
+		-- Update all profile's skillset
+		for idx, p in ipairs(mp._global._profiles) do
+			local old_idx = p.skillset
+			local new_idx = old_idx
+
+			if old_idx == old_skill_index then
+				new_idx = new_index
+			elseif old_skill_index < new_index then
+				if old_idx > old_skill_index and old_idx <= new_index then
+					new_idx = old_idx - 1
+				end
+			else
+				if old_idx >= new_index and old_idx < old_skill_index then
+					new_idx = old_idx + 1
+				end
+			end
+
+			p.skillset = new_idx
+
+			-- Save current profile's skillset
+			if idx == mp._global._current_profile then
+				current_profile_new_skillset = new_idx
+			end
+		end
+
+		-- Switch skillset of the current profiles to new index
+		if current_profile_new_skillset then
+			managers.skilltree:switch_skills(current_profile_new_skillset)
+
+			-- Update deployable, otherwise "deployable_secondary" will be cleared
+			for slot, deployable_name in ipairs(c_profile_deployable) do
+				if c_profile_deployable  then
+					managers.blackmarket:equip_deployable({
+						target_slot = slot,
+						name = deployable_name
+					})
+				end
+			end
+
+			-- Refresh inventory widgets
+			local mcm = managers.menu_component
+			if mcm._player_inventory_gui then
+				local node = mcm._player_inventory_gui._node
+				mcm:close_inventory_gui()
+				mcm:create_inventory_gui(node)
+			elseif mcm._mission_briefing_gui then
+				managers.assets:on_profile_switch()
+				managers.preplanning:on_multi_profile_changed()
+				local node = mcm._mission_briefing_gui._node
+				mcm:close_mission_briefing_gui()
+				mcm:create_mission_briefing_gui(node)
+			end
+		end
+	end
+
 	-- 替换custom筛选器的profile索引
 	for _, filter in ipairs(self.custom.filters) do
-	    for _, profile in ipairs(filter.profiles) do
-	        if profile.idx == old_index then
-	            profile.idx = new_index
-	        elseif old_index < profile.idx and profile.idx <= new_index then
-	            profile.idx = profile.idx - 1
-	        elseif new_index <= profile.idx and profile.idx < old_index then
-	            profile.idx = profile.idx + 1
-	        end
-	    end
+		for _, profile in ipairs(filter.profiles) do
+			if profile.idx == old_index then
+				profile.idx = new_index
+			elseif old_index < profile.idx and profile.idx <= new_index then
+				profile.idx = profile.idx - 1
+			elseif new_index <= profile.idx and profile.idx < old_index then
+				profile.idx = profile.idx + 1
+			end
+		end
 	end
 
 	self:save()
@@ -1916,7 +1975,7 @@ function ProfileReborn:switch_filter(value, base_filter, custom_dy)
 		self._controller_cls.profile_list:perform_scroll(custom_dy)
 	elseif self._bg_h * #self:profiles_panel() >= self._panel:h() then
 		local current_ui
-		if self._current_filter ~= 1 then
+		if self._current_filter ~= 1 or self._profile_sort_mode ~= 1 then
 			for k, ui in ipairs(self:profiles_panel()) do
 				if ui:layer() == managers.multi_profile._global._current_profile then
 					current_ui = k
@@ -1932,11 +1991,6 @@ function ProfileReborn:switch_filter(value, base_filter, custom_dy)
 			self._controller_cls.profile_list:perform_scroll(-dy)
 		end
 	end
-	
-	for _, method in ipairs(self.filter_method) do
-		local child = self._filter:child("bp_filter_" .. method)
-		child:set_visible(child:layer() == self._current_filter)
-	end
 end
 
 function ProfileReborn:switch_perk(perk)
@@ -1949,6 +2003,8 @@ function ProfileReborn:switch_perk(perk)
 		for i = 1, #profile do
 			self:set_profile(i, profile[i].profile, profile[i].idx)
 		end
+
+		self:sort_profiles_by_mode()
 
 		-- self.perk_deck.panels[self.perk_deck.display_mode]:set_selected(perk)
 
@@ -1972,6 +2028,8 @@ function ProfileReborn:switch_custom(key)
 			self:set_profile(i, profile[i].profile, profile[i].idx, true)
 		end
 		
+		self:sort_profiles_by_mode()
+
 		self.custom.current_custom_filter = key
 		managers.mouse_pointer:set_pointer_image("arrow")
 	end
@@ -2115,6 +2173,8 @@ function ProfileReborn:update_items_list(scroll_position, search_list, search_te
 		for i, profile in pairs(self.profiles) do
 			self:set_profile(i, profile, i, false, true)
 		end
+
+		self:sort_profiles_by_mode()
 
 		return
 	end
@@ -2266,6 +2326,7 @@ function ProfileReborn:save()
 	
 	local save_data = {
 		current_filter = self._current_filter,
+		profile_sort_mode = self._profile_sort_mode,
 		custom = save_filters,
 		current_custom_filter = self.custom.current_custom_filter,
 		perk_deck_display_mode = self.perk_deck.display_mode or (self.save_data and self.save_data.perk_deck_display_mode or 1)

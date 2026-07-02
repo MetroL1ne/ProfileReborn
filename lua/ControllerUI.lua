@@ -1422,3 +1422,207 @@ function PRebornBoxGuiObject:_create_side(panel, side, type, texture, one_two_al
 
 	return side_panel
 end
+
+-- 切换按钮Lib
+PRebornMultipleToggle = PRebornMultipleToggle or class()
+
+function PRebornMultipleToggle:init(panel, data)
+	self.class = "multiple_toggle"
+	self._parent = panel
+	self._state = data.state or false
+
+	self._panel = panel:panel(data)
+
+	self.items = data.items or {}
+
+	if #self.items == 0 then
+		error("MultipleToggle must include (items)")
+	end
+
+	self.index = data.index or 1
+
+	self._controllers = {}
+
+	self._controllers.bg_button = PRebornButton:new(self._panel, {
+		w = self._panel:w(),
+		h = self._panel:h(),
+		bg_color = data.bg_color or Color.white,
+		bg_alpha = data.bg_alpha or 0,
+		bg_layer = data.bg_layer or 1,
+		active = false
+	})
+
+	local filter_panel = self._panel
+
+	local menu_arrows_texture = "guis/textures/menu_arrows"
+
+	self._controllers.set_filter_left = PRebornButton:new(filter_panel, {
+		w = filter_panel:h(),
+		h = filter_panel:h(),
+		selection_mode = 2,
+		callback = function()
+			if (self.index - 1) >= 1 then
+				self:toggle(self.index - 1)
+			end
+		end
+	})
+
+	local arrow_left_panel = self._controllers.set_filter_left:panel()
+
+	local arrow_left = arrow_left_panel:bitmap({
+		texture = menu_arrows_texture,
+		layer = 2,
+		texture_rect = {
+			0,
+			0,
+			24,
+			24
+		}
+	})
+
+	arrow_left_panel:set_center_y(filter_panel:h() / 2)
+	arrow_left:set_center_y(arrow_left_panel:h() / 2)
+
+	self._controllers.set_filter_right = PRebornButton:new(filter_panel, {
+		w = filter_panel:h(),
+		h = filter_panel:h(),
+		selection_mode = 2,
+		callback = function()
+			if (self.index + 1) <= #self.items then
+				self:toggle(self.index + 1)
+			end
+		end
+	})
+
+	local arrow_right_panel = self._controllers.set_filter_right:panel()
+
+	local arrow_right = arrow_right_panel:bitmap({
+		texture = menu_arrows_texture,
+		layer = 2,
+		rotation = 180,
+		texture_rect = {
+			0,
+			0,
+			24,
+			24
+		}
+	})
+
+	arrow_right_panel:set_right(filter_panel:w())
+	arrow_right_panel:set_center_y(filter_panel:h() / 2)
+	arrow_right:set_right(arrow_right_panel:w())
+	arrow_right:set_center_y(arrow_right_panel:h() / 2)
+
+	local filter_bg = filter_panel:rect({
+		color = Color.black,
+		alpha = 0.9,
+		layer = -50,
+		w = filter_panel:w(),
+		h = filter_panel:h()
+	})
+
+	for layer, method in ipairs(self.items) do
+		filter_panel:text({
+			name = "bp_filter_" .. tostring(layer),
+			visible = layer == self.index,
+			vertical = "center",
+			valign = "center",
+			align = "center",
+			halign = "center",
+			font = tweak_data.hud_players.ammo_font,
+			text = method,
+			font_size = 18,
+			layer = layer,
+			color = data.text_color
+		})
+	end
+
+	self:create_side(filter_panel)
+
+	self._filter_panel = filter_panel
+
+	self._callback = data.callback
+end
+
+function PRebornMultipleToggle:panel()
+	return self._panel
+end
+
+function PRebornMultipleToggle:parent()
+	return self._parent
+end
+
+function PRebornMultipleToggle:destroy()
+	self:parent():remove(self._panel)
+end
+
+function PRebornMultipleToggle:callback()
+	return self._callback
+end
+
+function PRebornMultipleToggle:set_callback(clbk)
+	self._callback = clbk
+end
+
+function PRebornMultipleToggle:mouse_moved(o, x, y)
+	local mouse_inside = false
+
+	for _, cls in pairs(self._controllers) do
+		mouse_inside = cls:mouse_moved(o, x, y) and true or mouse_inside
+	end
+
+	return mouse_inside
+end
+
+function PRebornMultipleToggle:mouse_pressed(button, x, y)
+	if button == Idstring("0") then
+		if self:inside(x, y) then
+			for _, cls in pairs(self._controllers) do
+				cls:mouse_pressed(button, x, y)
+			end
+		end
+	end
+end
+
+function PRebornMultipleToggle:mouse_released(button, x, y)
+	if button == Idstring("0") then
+		if self:inside(x, y) then
+			for _, cls in pairs(self._controllers) do
+				cls:mouse_released(button, x, y)
+			end
+		end
+	end
+end
+
+function PRebornMultipleToggle:inside(x, y)
+	if self._panel:inside(x, y) then
+		return true, "link"
+	end
+
+	return false, "arrow"
+end
+
+function PRebornMultipleToggle:toggle(index)
+	local new_index = index
+	self:set_state(new_index)
+
+	return new_index
+end
+
+function PRebornMultipleToggle:set_state(index)
+	self.index = index
+
+	for layer, method in ipairs(self.items) do
+		local child = self._filter_panel:child("bp_filter_" .. layer)
+		child:set_visible(child:layer() == self.index)
+	end
+
+	self._callback(index)
+end
+
+function PRebornMultipleToggle:create_side(panel)
+	BoxGuiObject:_create_side(panel, "left", 1, false, false)
+	BoxGuiObject:_create_side(panel, "right", 1, false, false)
+	BoxGuiObject:_create_side(panel, "top", 1, false, false)
+	BoxGuiObject:_create_side(panel, "bottom", 1, false, false)
+end

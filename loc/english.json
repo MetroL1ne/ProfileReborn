@@ -10,5 +10,19 @@
 	
 	"menu_bp_perk_display_icon_1" : "Icon",
 	"menu_bp_perk_display_text" : "Text",
-	"menu_bp_perk_display_text_sort" : "Sorted Text"
+	"menu_bp_perk_display_text_sort" : "Sorted Text",
+
+	"menu_bp_profile_sort_mode_build_order" : "Build Order",
+	"menu_bp_profile_sort_mode_build_name" : "Build Name",
+
+	// Settings //
+
+	"menu_bp_settings_ProfileReborn_title" : "Profile Reborn Settings",
+	"menu_bp_settings_ProfileReborn_desc" : "",
+
+	"menu_bp_settings_IsMoveSkillpoint_title" : "Move Skillpoint Position",
+	"menu_bp_settings_IsMoveSkillpoint_desc" : "When moving a profile, also move the skillpoint position accordingly.",
+
+	"menu_bp_settings_WheelScrollValue_title" : "Profile Wheel Scroll Value",
+	"menu_bp_settings_WheelScrollValue_desc" : "Profile Wheel Scroll Value"
 }

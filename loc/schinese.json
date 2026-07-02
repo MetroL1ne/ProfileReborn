@@ -10,5 +10,19 @@
 	
 	"menu_bp_perk_display_icon_1" : "图标",
 	"menu_bp_perk_display_text" : "文字",
-	"menu_bp_perk_display_text_sort" : "文字排序"
+	"menu_bp_perk_display_text_sort" : "文字排序",
+
+	"menu_bp_profile_sort_mode_build_order" : "构建顺序",
+	"menu_bp_profile_sort_mode_build_name" : "构建名称",
+
+	// Settings //
+
+	"menu_bp_settings_ProfileReborn_title" : "Profile Reborn设置",
+	"menu_bp_settings_ProfileReborn_desc" : "",
+
+	"menu_bp_settings_IsMoveSkillpoint_title" : "移动技能组位置",
+	"menu_bp_settings_IsMoveSkillpoint_desc" : "当移动Profile时，同步移动技能组位置",
+
+	"menu_bp_settings_WheelScrollValue_title" : "滚轮移动Profile灵敏度",
+	"menu_bp_settings_WheelScrollValue_desc" : ""
 }
