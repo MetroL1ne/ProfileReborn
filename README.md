@@ -5,7 +5,6 @@
 - Added a new profile sorting option (by name)
 - Change all perk icons from the first card to the last card
 - Fixed hit detection issues with the profile button
-- Thanks to rowyag for translating the v1.12 changelog into english
 - v1.12 Changelog translated by rowyag
 
 **1.11**
